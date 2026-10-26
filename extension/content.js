@@ -86,7 +86,7 @@
     boot.ports.forEach((port) => port.postMessage({ type: 'state', state }));
     if (boot.dock) {
       boot.dock.update(state);
-      boot.dock.setVisible(state.mode === 'select');
+      boot.dock.setVisible(boot.ports.size > 0);
     }
     chrome.runtime.sendMessage({ type: 'badge', count: state.applied }).catch(() => {});
     if (ev && ev.type === 'history') persist();
@@ -141,7 +141,8 @@
     boot.dock = dock;
     const state = engine.getState({ tree: false });
     dock.update(state);
-    dock.setVisible(state.mode === 'select');
+    // 도크는 사이드 패널이 붙어 있는 동안 보인다. "동작" 모드로 바꿔도 패널이 열려 있으면 그대로 둔다.
+    dock.setVisible(boot.ports.size > 0);
   }
   boot.announce = () => broadcast(null);
 
@@ -151,9 +152,11 @@
     // 패널이 붙어 있는 동안만 선택 모드. 떨어지면 페이지를 원래대로 쓸 수 있게 대기 모드로 돌아간다.
     if (boot.engine && boot.ports.size === 1) boot.engine.setMode('select');
     if (boot.engine) restoreOnce();
+    if (boot.dock) boot.dock.setVisible(true);
     port.onDisconnect.addListener(() => {
       boot.ports.delete(port);
       if (boot.engine && boot.ports.size === 0) boot.engine.setMode('interact');
+      if (boot.dock && boot.ports.size === 0) boot.dock.setVisible(false);
     });
     port.onMessage.addListener(async (msg) => {
       if (msg && msg.type === 'chat-result') {
@@ -187,6 +190,8 @@
       onChange: broadcast,
       onNotice: (message) => notify(message),
       initialMode: boot.ports.size ? 'select' : 'interact',
+      // 패널이 닫혀 있으면 페이지 자체의 단축키(E, Space)를 가로채지 않는다.
+      modeKeys: () => boot.ports.size > 0,
       blockNavigation: false,
     });
     boot.engine = engine;
