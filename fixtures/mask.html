@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가리개 시안 (쿠팡형 상품 카드)</title>
+<style>
+  body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; background: #fff; color: #111; }
+  .wrap { padding: 32px 40px; }
+  h2 { font-size: 24px; margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; list-style: none; margin: 0; padding: 0; }
+  .card { position: relative; border: 1px solid #e5e5e5; }
+  .card a { display: block; padding: 20px; color: inherit; text-decoration: none; }
+  .thumb { display: block; width: 100%; height: 140px; background: linear-gradient(135deg, #e9e4ff, #c9b8ff); border-radius: 8px; }
+  .name { margin: 12px 0 0; font-size: 15px; }
+  .price { margin: 4px 0 0; font-weight: 700; color: #c00; }
+  /* 쿠팡의 span.mask: 빈 요소가 카드 전체를 덮고 테두리만 가진다 */
+  .mask { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 1px solid transparent; box-sizing: border-box; }
+  .card:hover .mask { border-color: #346aff; }
+  /* Bootstrap식 stretched link: 빈 a가 카드를 덮는다 */
+  .card--stretched .stretched { position: absolute; inset: 0; }
+  .badge { position: absolute; top: 8px; left: 8px; padding: 2px 6px; background: #c00; color: #fff; font-size: 11px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>오늘의 발견</h2>
+    <ul class="grid">
+      <li class="card"><a href="#"><span class="thumb"></span><p class="name">테이크핏 몬스터</p><p class="price">12,900원</p><span class="mask"></span></a></li>
+      <li class="card"><a href="#"><span class="thumb"></span><p class="name">블루베리 스프레드</p><p class="price">8,400원</p><span class="mask"></span></a><span class="badge">로켓</span></li>
+      <li class="card card--stretched"><span class="thumb"></span><p class="name">상하목장 유기농 우유</p><p class="price">6,200원</p><a class="stretched" href="#" aria-label="상세"></a></li>
+    </ul>
+  </div>
+</body>
+</html>

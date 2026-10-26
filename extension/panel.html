@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>frame-mesh</title>
+<link rel="stylesheet" href="../src/panel/panel.css">
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header class="ext__top">
+  <div class="ext__row">
+    <span class="brand">frame-mesh</span>
+    <span class="ext__target" id="tabLabel" hidden></span>
+    <select id="tabSelect" title="대상 탭" hidden></select>
+    <button class="btn btn--warn" id="btnConnect" type="button" title="이 페이지와의 연결이 끊겼습니다. 누르면 다시 연결합니다." hidden>연결 끊김 · 다시 연결</button>
+  </div>
+  <div class="ext__applied is-clean" id="appliedChip">변경 없음 · 원본 상태 · 로그는 페이지 아래 도크</div>
+</header>
+<section class="ext__section ext__section--tree" id="treeSection">
+  <button class="ext__section-head" type="button" data-toggle="treeSection">레이어 <span class="ext__hint">드래그로 이동 · 클릭하면 접기</span></button>
+  <div class="tree" id="tree"></div>
+</section>
+<section class="ext__section ext__section--props" id="propsSection">
+  <button class="ext__section-head" type="button" data-toggle="propsSection">속성</button>
+  <div class="props" id="props"></div>
+</section>
+<footer class="ext__status" id="status">연결 안 됨</footer>
+<div class="notice" id="notice" hidden></div>
+<script type="module" src="panel.js"></script>
+</body>
+</html>

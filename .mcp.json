@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "frame-mesh": {
+      "command": "python3",
+      "args": ["tools/fm_mcp.py"],
+      "env": { "FRAME_MESH_URL": "http://127.0.0.1:4173" }
+    }
+  }
+}

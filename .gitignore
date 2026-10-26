@@ -1,0 +1,5 @@
+# 전달 묶음과 실행 부산물은 저장소에 넣지 않는다.
+handoffs/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,23 @@
+/* 확장 사이드 패널 레이아웃: 레이어(위)·속성(아래). 도구 모음과 변경 로그는 페이지 안 도크에 있다. */
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; background: var(--panel); min-width: 280px; }
+.ext__top { border-bottom: 1px solid var(--line); padding: 8px 10px; }
+.ext__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ext__target { flex: 1; min-width: 0; color: var(--ink-2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext__target.is-blocked { color: var(--ink-3); }
+.ext__row select { flex: 1; min-width: 120px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fafafc; font-size: 11px; }
+
+.ext__section { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line); }
+.ext__section--tree { flex: 0 0 38%; }
+.ext__section--props { flex: 1 1 auto; border-bottom: 0; }
+.ext__section.is-collapsed { flex: 0 0 auto; }
+.ext__section.is-collapsed .tree, .ext__section.is-collapsed .props { display: none; }
+.ext__section--tree.is-collapsed + .ext__section--props { flex: 1 1 auto; }
+.ext__section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 7px 12px; border: 0; border-bottom: 1px solid var(--line); background: #fafafc; text-align: left; font-weight: 600; color: var(--ink-2); }
+.ext__hint { color: var(--ink-3); font-weight: 400; font-size: 11px; }
+.ext__section .tree, .ext__section .props { flex: 1; min-height: 0; overflow: auto; }
+
+.ext__status { padding: 5px 10px; color: var(--ink-3); border-top: 1px solid var(--line); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext__applied { margin-top: 6px; padding: 4px 8px; border-radius: 6px; background: #fff4e5; color: #9a4b00; font-weight: 600; font-size: 11px; }
+.ext__applied.is-clean { background: #eef7ee; color: #1e7a3a; font-weight: 400; }
+.btn--warn { background: #fff4e5; border-color: #f5c27a; color: #9a4b00; font-weight: 600; }

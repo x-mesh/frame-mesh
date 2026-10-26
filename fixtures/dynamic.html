@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>동적 렌더 시안 (SPA 흉내)</title>
+<style>
+  body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; background: #f5f3ff; color: #1f1a2e; }
+  .app { padding: 32px 40px; }
+  .card { background: #fff; border: 1px solid #e4e0f2; border-radius: 12px; padding: 16px; margin-bottom: 10px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card p { margin: 0; color: #6b6480; font-size: 13px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+  button { padding: 8px 14px; border: 0; border-radius: 8px; background: #5b21b6; color: #fff; }
+  .empty { color: #9a9aa6; padding: 24px; text-align: center; }
+</style>
+</head>
+<body>
+  <div id="root"><p class="empty">불러오는 중…</p></div>
+  <script>
+    // 800ms 뒤에 본문을 그리고, 1.6초 뒤에 카드를 하나 더 붙인다. SPA의 비동기 렌더를 흉내 낸다.
+    const root = document.getElementById('root');
+    setTimeout(() => {
+      root.innerHTML = `
+        <main class="app">
+          <div class="toolbar"><button type="button">새 작업</button><button type="button">새로고침</button></div>
+          <section class="list">
+            <article class="card"><h3>첫 번째 작업</h3><p>늦게 렌더링된 카드입니다.</p></article>
+            <article class="card"><h3>두 번째 작업</h3><p>이 카드도 주입 뒤에 생겼습니다.</p></article>
+          </section>
+        </main>`;
+    }, 800);
+    setTimeout(() => {
+      const list = document.querySelector('.list');
+      if (list) list.insertAdjacentHTML('beforeend', '<article class="card card--late"><h3>세 번째 작업</h3><p>더 늦게 추가된 카드입니다.</p></article>');
+    }, 1600);
+  </script>
+</body>
+</html>

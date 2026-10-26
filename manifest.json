@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "frame-mesh",
+  "version": "0.1.0",
+  "description": "열린 페이지의 요소를 선택·이동·조정하고, 변경 로그를 LLM에 전달하는 UI 작업실",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_title": "frame-mesh: 이 탭에서 편집"
+  },
+  "background": {
+    "service_worker": "extension/background.js"
+  },
+  "side_panel": {
+    "default_path": "extension/panel.html"
+  },
+  "permissions": [
+    "scripting",
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/core/*.js",
+        "src/panel/*.js",
+        "src/panel/*.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

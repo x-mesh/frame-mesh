@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>예제 시안 · 계획 상세</title>
+<style>
+  :root {
+    --purple-700: #4c1d95;
+    --purple-600: #5b21b6;
+    --purple-500: #7c3aed;
+    --purple-200: #ddd6fe;
+    --purple-100: #ede9fe;
+    --purple-50: #f5f3ff;
+    --ink: #1f1a2e;
+    --ink-muted: #6b6480;
+    --line: #e4e0f2;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--purple-50);
+    line-height: 1.6;
+  }
+  .doc-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 32px 40px 24px;
+    background: var(--white);
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--purple-600);
+    background: var(--purple-100);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .doc-header h1 { margin: 12px 0 8px; font-size: 28px; line-height: 1.3; }
+  .doc-header .meta { margin: 0; color: var(--ink-muted); font-size: 14px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 32px;
+    padding: 32px 40px 48px;
+  }
+  .checklist h2, .body h2 { margin: 0 0 16px; font-size: 18px; }
+  .check-list { list-style: none; margin: 0; padding: 0; }
+  .check-item {
+    min-height: 130px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .check-item__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .check-item__title { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
+  .check-item__desc { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-muted); }
+  .chip {
+    flex: none;
+    padding: 1px 8px;
+    font-size: 11px;
+    line-height: 1.6;
+    border-radius: 6px;
+    background: var(--purple-100);
+    color: var(--purple-700);
+  }
+  .chip--done { background: #e6f4ea; color: #1e7a3a; }
+  .body { display: flex; flex-direction: column; gap: 32px; }
+  .section {
+    background: var(--white);
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+  .section p { margin: 0 0 20px; }
+  .section p:last-child { margin-bottom: 0; }
+  .section ol, .section ul { margin: 0; padding-left: 22px; }
+  .section li { margin-bottom: 12px; }
+  .team-activity { background: var(--white); padding: 24px 32px; border: 1px solid var(--line); border-radius: 16px; }
+  .activity { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .activity:last-child { border-bottom: 0; }
+  .activity time { color: var(--ink-muted); min-width: 56px; }
+  .actions { display: flex; justify-content: center; padding-top: 24px; }
+  .btn-primary {
+    background: var(--purple-600);
+    color: var(--white);
+    border: 0;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary:hover { background: var(--purple-700); }
+  @media (max-width: 720px) {
+    .doc-header { flex-direction: column; padding: 20px 16px; }
+    .doc-header h1 { font-size: 22px; }
+    .layout { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px 32px; }
+    .section { padding: 20px; }
+    .team-activity { padding: 16px 20px; }
+  }
+</style>
+</head>
+<body>
+  <header class="doc-header">
+    <div class="doc-header__title">
+      <span class="eyebrow">계획</span>
+      <h1>2026년 4분기 결제 흐름 개편</h1>
+      <p class="meta">담당 기획팀 · 마감 11월 14일 · 마지막 수정 2시간 전</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="checklist">
+      <h2>내가 확인할 일</h2>
+      <ul class="check-list">
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">범위 확정 승인</p>
+            <span class="chip">대기</span>
+          </div>
+          <p class="check-item__desc">환불 정책 변경을 이번 범위에 포함할지 결정합니다.</p>
+        </li>
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">결제 모듈 설계 검토</p>
+            <span class="chip">대기</span>
+          </div>
+          <p class="check-item__desc">PG 연동 재시도 정책과 멱등성 키 설계를 확인합니다.</p>
+        </li>
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">디자인 시안 선택</p>
+            <span class="chip chip--done">완료</span>
+          </div>
+          <p class="check-item__desc">퍼플·화이트 팔레트로 확정했습니다.</p>
+        </li>
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">출시 점검 일정 합의</p>
+            <span class="chip">대기</span>
+          </div>
+          <p class="check-item__desc">QA와 운영팀 일정이 겹치지 않는지 확인합니다.</p>
+        </li>
+      </ul>
+    </aside>
+
+    <section class="body">
+      <article class="section section--tasks">
+        <h2>수행 작업</h2>
+        <ol>
+          <li>결제 요청과 승인 응답을 분리해 재시도 가능한 상태 기계로 재구성합니다.</li>
+          <li>카드·간편결제·계좌이체의 결과 화면을 하나의 레이아웃으로 통일합니다.</li>
+          <li>실패 사유를 사용자 문구와 운영 로그로 각각 기록합니다.</li>
+          <li>기존 주문 데이터는 마이그레이션 없이 새 상태 값을 읽을 수 있게 호환 계층을 둡니다.</li>
+        </ol>
+      </article>
+
+      <article class="section section--criteria">
+        <h2>완료 조건</h2>
+        <ul>
+          <li>결제 성공률 측정값이 개편 전과 같거나 높습니다.</li>
+          <li>중복 결제가 재현 시나리오 12개에서 발생하지 않습니다.</li>
+          <li>모바일과 데스크톱에서 결과 화면이 같은 정보를 보여 줍니다.</li>
+        </ul>
+      </article>
+
+      <section class="team-activity">
+        <h2>팀 활동</h2>
+        <div class="activity"><time>10:42</time><span>개발자가 결제 상태 기계 다이어그램을 올렸습니다.</span></div>
+        <div class="activity"><time>09:15</time><span>디자이너가 완료 조건 2번을 수정했습니다.</span></div>
+        <div class="activity"><time>어제</time><span>운영팀이 출시 점검 일정 초안을 공유했습니다.</span></div>
+      </section>
+
+      <div class="actions">
+        <button type="button" class="btn-primary">계획 상세 검토</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
