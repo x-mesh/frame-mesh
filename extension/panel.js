@@ -218,6 +218,57 @@ function installSectionToggles() {
   document.querySelectorAll('.ext__section-head').forEach((head) => {
     head.addEventListener('click', () => $(head.dataset.toggle).classList.toggle('is-collapsed'));
   });
+  installSplitter();
+}
+
+const TREE_HEIGHT_KEY = 'fm:panel:treeHeight';
+const TREE_MIN_PX = 80;
+const PROPS_MIN_PX = 160;
+
+// 레이어와 속성 사이 경계를 끌어 레이어 높이를 정한다. 높이는 이 브라우저에만 기억한다.
+function installSplitter() {
+  const splitter = $('splitter');
+  const tree = $('treeSection');
+  const setHeight = (px) => {
+    const max = window.innerHeight - PROPS_MIN_PX - tree.getBoundingClientRect().top;
+    tree.style.flexBasis = `${Math.max(TREE_MIN_PX, Math.min(px, max))}px`;
+  };
+  try {
+    const saved = Number(localStorage.getItem(TREE_HEIGHT_KEY));
+    if (saved) setHeight(saved);
+  } catch {
+    // 저장소를 쓸 수 없으면 기본 높이로 둔다.
+  }
+  let drag = null;
+  splitter.addEventListener('pointerdown', (e) => {
+    drag = { pointerId: e.pointerId, startY: e.clientY, startH: tree.getBoundingClientRect().height };
+    splitter.setPointerCapture(e.pointerId);
+    splitter.classList.add('is-active');
+    e.preventDefault();
+  });
+  splitter.addEventListener('pointermove', (e) => {
+    if (drag && e.pointerId === drag.pointerId) setHeight(drag.startH + e.clientY - drag.startY);
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag = null;
+    splitter.classList.remove('is-active');
+    try {
+      localStorage.setItem(TREE_HEIGHT_KEY, String(Math.round(tree.getBoundingClientRect().height)));
+    } catch {
+      // 저장하지 못해도 이번 창에서는 바꾼 높이가 유지된다.
+    }
+  };
+  splitter.addEventListener('pointerup', end);
+  splitter.addEventListener('pointercancel', end);
+  splitter.addEventListener('dblclick', () => {
+    tree.style.flexBasis = '';
+    try {
+      localStorage.removeItem(TREE_HEIGHT_KEY);
+    } catch {
+      // 저장소를 쓸 수 없으면 이번 창만 원래대로 돌린다.
+    }
+  });
 }
 
 async function init() {

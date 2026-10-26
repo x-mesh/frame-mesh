@@ -23,7 +23,13 @@ function formatComputed(value) {
 
 export function createPanel({ els, bridge, receiver, keyboard = true }) {
   const receiverStore = receiver || { get: async () => '/handoff', set: async () => {} };
-  const view = { state: null, selectionId: null, fields: new Map(), treeRows: new Map(), dragId: null, dropRow: null, handoff: null, noticeTimer: 0 };
+  const view = {
+    state: null, selectionId: null, fields: new Map(), treeRows: new Map(), dragId: null, dropRow: null, handoff: null, noticeTimer: 0,
+    // 레이어 접기: treeInfo는 행마다 부모와 자식 유무, expanded·collapsed는 사용자가 직접 펼치고 접은 행이다.
+    treeInfo: new Map(), expanded: new Set(), collapsed: new Set(), modifiedIds: new Set(),
+    // 속성 묶음을 사용자가 직접 펼치거나 접은 기록. 요소를 바꿔도 유지한다.
+    groupOverride: new Map(),
+  };
   const doc = els.props.ownerDocument;
 
   function call(method, ...args) {
@@ -43,15 +49,22 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     if (!els.tree) return;
     els.tree.textContent = '';
     view.treeRows.clear();
+    view.treeInfo.clear();
     const frag = doc.createDocumentFragment();
-    rows.forEach((r) => {
+    const stack = [];
+    rows.forEach((r, i) => {
+      while (stack.length && stack[stack.length - 1].depth >= r.depth) stack.pop();
+      const parent = stack.length ? stack[stack.length - 1].id : null;
+      const hasChildren = !!(rows[i + 1] && rows[i + 1].depth > r.depth);
+      view.treeInfo.set(r.id, { parent, depth: r.depth, hasChildren });
+      stack.push(r);
       const row = doc.createElement('div');
       row.className = 'tree__row';
       row.style.setProperty('--depth', r.depth);
       row.dataset.id = r.id;
       row.dataset.canHold = r.canHold ? '1' : '';
       row.draggable = r.draggable;
-      row.innerHTML = `<span class="tree__tag">${esc(r.tag)}</span><span class="tree__meta">${esc(r.meta)}</span>`;
+      row.innerHTML = `<span class="tree__caret" title="펼치기·접기"></span><span class="tree__tag">${esc(r.tag)}</span><span class="tree__meta">${esc(r.meta)}</span>`;
       frag.appendChild(row);
       view.treeRows.set(r.id, row);
     });
@@ -62,6 +75,44 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       frag.appendChild(more);
     }
     els.tree.appendChild(frag);
+  }
+
+  // 선택한 요소의 조상은 저절로 펼치고, 나머지는 사용자가 펼친 것만 보인다. 접힌 행 안에 바뀐 요소가 있으면 점으로 알린다.
+  function applyTreeVisibility() {
+    const sel = view.state && view.state.selection;
+    const auto = new Set(sel ? sel.crumbs.map((c) => c.id) : []);
+    const isOpen = (id, info) => !view.collapsed.has(id) && (info.depth === 0 || auto.has(id) || view.expanded.has(id));
+    const insideModified = new Set();
+    view.modifiedIds.forEach((id) => {
+      for (let cur = view.treeInfo.get(id); cur && cur.parent; cur = view.treeInfo.get(cur.parent)) insideModified.add(cur.parent);
+    });
+    const visible = new Map();
+    for (const [id, row] of view.treeRows) {
+      const info = view.treeInfo.get(id);
+      const shown = !info.parent || (visible.get(info.parent) && isOpen(info.parent, view.treeInfo.get(info.parent)));
+      visible.set(id, shown);
+      row.hidden = !shown;
+      const open = info.hasChildren && isOpen(id, info);
+      row.querySelector('.tree__caret').textContent = info.hasChildren ? (open ? '▾' : '▸') : '';
+      row.classList.toggle('is-modified', view.modifiedIds.has(id));
+      row.classList.toggle('has-modified', info.hasChildren && !open && insideModified.has(id));
+    }
+  }
+
+  function toggleTreeRow(id) {
+    const info = view.treeInfo.get(id);
+    if (!info || !info.hasChildren) return;
+    const sel = view.state && view.state.selection;
+    const auto = sel && sel.crumbs.some((c) => c.id === id);
+    const open = !view.collapsed.has(id) && (info.depth === 0 || auto || view.expanded.has(id));
+    if (open) {
+      view.expanded.delete(id);
+      view.collapsed.add(id);
+    } else {
+      view.collapsed.delete(id);
+      view.expanded.add(id);
+    }
+    applyTreeVisibility();
   }
 
   function highlightTreeRow() {
@@ -91,7 +142,12 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
   function installTreeEvents() {
     els.tree.addEventListener('click', (e) => {
       const row = rowFromEvent(e);
-      if (row) call('select', row.dataset.id);
+      if (!row) return;
+      if (e.target.closest('.tree__caret')) {
+        toggleTreeRow(row.dataset.id);
+        return;
+      }
+      call('select', row.dataset.id);
     });
     els.tree.addEventListener('dragstart', (e) => {
       const row = rowFromEvent(e);
@@ -248,12 +304,36 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  const PROP_LABELS = new Map(PROP_GROUPS.flatMap((g) => g.fields.map((f) => [f.prop, `${g.title} · ${f.label}`])));
+  const showValue = (v) => (v === '' || v == null ? '없음' : formatComputed(String(v)));
+  const quoted = (snippet) => {
+    const m = /"(.*)"$/.exec(snippet || '');
+    return m ? m[1] : '';
+  };
+
+  // 안에 링크나 강조가 섞여 있어도 글자가 중심인 태그.
+  const TEXT_TAGS = /^(h[1-6]|p|a|span|label|button|strong|em|b|i|small|figcaption)$/;
+
+  // 요소 종류에 따라 처음 펼칠 속성 묶음. 사용자가 직접 펼치거나 접은 묶음은 그 선택을 따른다.
+  function groupOpen(title, sel) {
+    if (view.groupOverride.has(title)) return view.groupOverride.get(title);
+    const group = PROP_GROUPS.find((g) => g.title === title);
+    if (group.fields.some((f) => (sel.fields[f.prop] || {}).inline)) return true;
+    // 빈 공간 경고는 최소 높이 때문이므로 크기 묶음을 함께 펼친다.
+    if (title === '크기' && sel.hint) return true;
+    const tag = sel.crumbs.length ? sel.crumbs[sel.crumbs.length - 1].tag : '';
+    return sel.editable || TEXT_TAGS.test(tag) ? ['글자', '색'].includes(title) : ['크기', '패딩', '마진', '배치'].includes(title);
+  }
+
   function rebuildSelection(sel) {
     const root = els.props;
     root.textContent = '';
     view.fields.clear();
-    const head = section(null);
-    head.innerHTML = '<div class="props__title" data-role="title"></div><div class="props__dims" data-role="dims"></div>';
+
+    // 머리글은 스크롤해도 위에 남아, 지금 무엇을 편집하는지 늘 보이게 한다.
+    const head = doc.createElement('div');
+    head.className = 'props__head';
+    head.innerHTML = '<div class="props__head-row"><span class="props__title" data-role="title"></span><span class="props__badge" data-role="modCount" hidden></span><span class="props__head-actions" data-role="headActions"></span></div><div class="props__snippet" data-role="snippet"></div><div class="props__dims" data-role="dims"></div>';
     const crumbs = doc.createElement('div');
     crumbs.className = 'crumbs';
     sel.crumbs.forEach((node, i) => {
@@ -267,12 +347,24 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       crumbs.appendChild(b);
     });
     head.appendChild(crumbs);
+    const parentBtn = actionButton('↑ 부모', () => call('selectParent'), '부모 요소 선택 (⇧Enter)');
+    const clearBtn = actionButton('✕', () => call('select', null), '선택 해제 (Esc)');
+    parentBtn.disabled = !sel.parent;
+    head.querySelector('[data-role="headActions"]').append(parentBtn, clearBtn);
     const hint = doc.createElement('div');
     hint.className = 'props__hint';
     hint.dataset.role = 'hint';
     hint.hidden = true;
     head.appendChild(hint);
     root.appendChild(head);
+    // 경로는 한 줄로 두고 끝(현재 요소)이 보이게 맨 오른쪽으로 민다.
+    requestAnimationFrame(() => { crumbs.scrollLeft = crumbs.scrollWidth; });
+
+    const changes = section('바꾼 값');
+    changes.classList.add('props__changes');
+    changes.dataset.role = 'changes';
+    changes.appendChild(Object.assign(doc.createElement('div'), { className: 'change-list' }));
+    root.appendChild(changes);
 
     const struct = section('구조');
     if (sel.parent) {
@@ -284,7 +376,6 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     const row = doc.createElement('div');
     row.className = 'actions-row';
     row.append(
-      actionButton('부모 선택', () => call('selectParent'), '⇧Enter'),
       actionButton('▲ 앞으로', () => call('moveWithin', -1), '같은 컨테이너 안에서 한 칸 앞으로'),
       actionButton('▼ 뒤로', () => call('moveWithin', 1), '같은 컨테이너 안에서 한 칸 뒤로'),
     );
@@ -300,11 +391,27 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     root.appendChild(struct);
 
     PROP_GROUPS.forEach((group) => {
-      const sec = section(group.title);
+      const sec = doc.createElement('div');
+      sec.className = 'props__section props__group';
+      sec.dataset.group = group.title;
+      const title = doc.createElement('button');
+      title.type = 'button';
+      title.className = 'props__section-title props__group-title';
+      title.innerHTML = `<span><span class="props__caret"></span>${esc(group.title)}</span><span class="props__group-count" data-role="count"></span>`;
       const grid = doc.createElement('div');
       grid.className = `fields${group.single ? ' fields--single' : ''}`;
       group.fields.forEach((def) => grid.appendChild(createField(def)));
-      sec.appendChild(grid);
+      const setOpen = (open) => {
+        sec.classList.toggle('is-collapsed', !open);
+        title.querySelector('.props__caret').textContent = open ? '▾' : '▸';
+      };
+      title.addEventListener('click', () => {
+        const open = sec.classList.contains('is-collapsed');
+        view.groupOverride.set(group.title, open);
+        setOpen(open);
+      });
+      setOpen(groupOpen(group.title, sel));
+      sec.append(title, grid);
       root.appendChild(sec);
     });
     const note = doc.createElement('p');
@@ -313,13 +420,50 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     root.appendChild(note);
   }
 
+  function renderChangeList(sel) {
+    const sec = els.props.querySelector('[data-role="changes"]');
+    const list = sec.querySelector('.change-list');
+    list.textContent = '';
+    sec.hidden = !sel.changes.length;
+    sec.querySelector('.props__section-title span').textContent = `바꾼 값 ${sel.changes.length}`;
+    sel.changes.forEach((c) => {
+      const item = doc.createElement('div');
+      item.className = 'change-item';
+      const label = Object.assign(doc.createElement('span'), { className: 'change-item__label', textContent: c.prop === '문구' ? '문구' : PROP_LABELS.get(c.prop) || c.prop });
+      label.title = c.prop;
+      const values = doc.createElement('span');
+      values.className = 'change-item__values';
+      values.append(
+        Object.assign(doc.createElement('span'), { className: 'change-item__before', textContent: showValue(c.before) }),
+        Object.assign(doc.createElement('span'), { className: 'change-item__arrow', textContent: '→' }),
+        Object.assign(doc.createElement('span'), { className: 'change-item__after', textContent: showValue(c.after) }),
+      );
+      values.title = `${showValue(c.before)} → ${showValue(c.after)}`;
+      item.append(label, values);
+      // 문구는 되돌릴 API가 없어 로그의 되돌리기를 쓴다.
+      if (c.prop !== '문구') {
+        const undo = Object.assign(doc.createElement('button'), { type: 'button', className: 'change-item__undo', textContent: '↺', title: '이 값만 원래대로' });
+        undo.addEventListener('click', () => call('setStyle', sel.id, c.prop, c.beforeInline));
+        item.appendChild(undo);
+      }
+      list.appendChild(item);
+    });
+  }
+
   function refreshSelection(sel) {
     const root = els.props;
     root.querySelector('[data-role="title"]').textContent = sel.label;
-    root.querySelector('[data-role="dims"]').textContent = `${sel.dims} · x ${sel.x} · y ${sel.y} · ${sel.id}`;
+    const snippet = root.querySelector('[data-role="snippet"]');
+    snippet.textContent = quoted(sel.snippet) ? `“${quoted(sel.snippet)}”` : '';
+    snippet.hidden = !snippet.textContent;
+    root.querySelector('[data-role="dims"]').textContent = `${sel.dims} · x ${sel.x} · y ${sel.y}`;
+    const badge = root.querySelector('[data-role="modCount"]');
+    badge.hidden = !sel.changes.length;
+    badge.textContent = `바뀜 ${sel.changes.length}`;
     const hint = root.querySelector('[data-role="hint"]');
     hint.hidden = !sel.hint;
     hint.textContent = sel.hint || '';
+    renderChangeList(sel);
     const pushRight = root.querySelector('[data-role="pushRight"]');
     if (pushRight) pushRight.classList.toggle('is-active', sel.pushRight);
     const editBtn = root.querySelector('[data-role="editText"]');
@@ -327,6 +471,12 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       editBtn.classList.toggle('is-active', !!sel.editing);
       editBtn.textContent = sel.editing ? '편집 중 · Enter 확정' : '문구 편집';
     }
+    root.querySelectorAll('.props__group').forEach((sec) => {
+      const group = PROP_GROUPS.find((g) => g.title === sec.dataset.group);
+      const n = group.fields.filter((f) => (sel.fields[f.prop] || {}).inline).length;
+      sec.querySelector('[data-role="count"]').textContent = n ? `바뀜 ${n}` : '';
+      sec.classList.toggle('has-modified', n > 0);
+    });
     for (const { def, input, wrap, valueLine } of view.fields.values()) {
       const { inline, computed } = sel.fields[def.prop] || { inline: '', computed: '' };
       if (def.scale) {
@@ -357,11 +507,28 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     }
   }
 
+  const EMPTY_KEYS = [
+    ['클릭', '눈에 보이는 상자 선택'],
+    ['더블클릭', '한 단계 안쪽'],
+    ['⌘클릭', '가장 깊은 요소'],
+    ['우클릭', '겹친 요소 목록'],
+    ['드래그 · 핸들', '옮기기 · 크기 바꾸기'],
+    ['방향키', '1px 이동 (Shift 10px)'],
+    ['E', '편집 켜기·끄기'],
+    ['Space 누르는 동안', '잠깐 페이지 사용'],
+  ];
+
   function renderSelection(sel) {
     if (!sel) {
       view.selectionId = null;
       view.fields.clear();
-      els.props.innerHTML = '<p class="props__empty">클릭하면 링크용 투명 가리개를 건너뛰고 눈에 보이는 상자를 고르고, 더블클릭은 한 단계 안쪽, ⌘클릭은 가장 깊은 요소, 우클릭은 겹친 요소 목록에서 고릅니다. 선택한 요소는 끌어 옮기고, 핸들로 크기를 바꾸고, 방향키로 1px씩 움직입니다.</p>';
+      els.props.textContent = '';
+      const wrap = Object.assign(doc.createElement('div'), { className: 'props__empty' });
+      wrap.appendChild(Object.assign(doc.createElement('p'), { className: 'props__empty-title', textContent: '페이지나 레이어에서 요소를 고르세요' }));
+      const list = Object.assign(doc.createElement('dl'), { className: 'keys' });
+      EMPTY_KEYS.forEach(([k, v]) => list.append(Object.assign(doc.createElement('dt'), { textContent: k }), Object.assign(doc.createElement('dd'), { textContent: v })));
+      wrap.appendChild(list);
+      els.props.appendChild(wrap);
       return;
     }
     if (sel.id !== view.selectionId) {
@@ -420,6 +587,11 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
 
   // ---------- 모드와 버튼 ----------
   function installControls() {
+    if (els.modeToggle) {
+      els.modeToggle.addEventListener('click', () => {
+        if (view.state) call('setMode', view.state.mode === 'select' ? 'interact' : 'select');
+      });
+    }
     if (els.modeSeg) {
       els.modeSeg.addEventListener('click', (e) => {
         const b = e.target.closest('.seg__btn');
@@ -439,6 +611,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     if (els.btnDiffView) els.btnDiffView.addEventListener('click', () => call('setDiffView', !(view.state && view.state.diffView)));
     if (els.btnUndo) els.btnUndo.addEventListener('click', () => call('undo'));
     if (els.btnRedo) els.btnRedo.addEventListener('click', () => call('redo'));
+    if (els.btnReset) els.btnReset.addEventListener('click', () => call('goto', 0));
     if (els.btnHandoff) els.btnHandoff.addEventListener('click', openHandoff);
     if (els.btnCopyLog) els.btnCopyLog.addEventListener('click', copyLogForLlm);
     if (els.btnSendLog) els.btnSendLog.addEventListener('click', sendToProject);
@@ -454,7 +627,10 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
         h.receiverInput.addEventListener('change', () => receiverStore.set(h.receiverInput.value.trim()));
       }
     }
-    if (keyboard) doc.addEventListener('keydown', onKeydown);
+    if (keyboard) {
+      doc.addEventListener('keydown', onKeydown);
+      doc.addEventListener('keyup', onKeyup);
+    }
   }
 
   function syncControls(state) {
@@ -472,6 +648,11 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     }
     if (els.btnUndo) els.btnUndo.disabled = !state.canUndo;
     if (els.btnRedo) els.btnRedo.disabled = !state.canRedo;
+    if (els.btnReset) els.btnReset.disabled = !state.canUndo;
+    if (els.modeToggle) {
+      els.modeToggle.setAttribute('aria-checked', String(state.mode === 'select'));
+      els.modeLabel.textContent = state.mode === 'select' ? '편집 중' : state.holding ? '잠깐 페이지 사용 중' : '페이지 사용 중';
+    }
     if (els.modeSeg) els.modeSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === state.mode));
     if (els.moveSeg) els.moveSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.move === state.moveMode));
   }
@@ -573,10 +754,36 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
   // ---------- 키보드 (패널 문서) ----------
   const isEditable = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
 
+  function onKeyup(e) {
+    if (e.key === ' ' && spaceHeld) {
+      spaceHeld = false;
+      e.preventDefault();
+      call('holdInteract', false);
+    }
+  }
+
+  // 웹 작업실에서는 초점이 미리보기 바깥에 있어 엔진이 키를 받지 못하므로, 같은 모드 단축키를 여기서도 받는다.
+  let spaceHeld = false;
   function onKeydown(e) {
     // 전달 대화상자가 열린 동안 단축키가 뒤의 문서를 바꾸면 대화상자 내용과 어긋난다.
     if (els.handoff && els.handoff.dialog.open) return;
     const mod = e.metaKey || e.ctrlKey;
+    const plain = !mod && !e.altKey && !e.isComposing && !isEditable(e.target);
+    if (e.key === ' ' && spaceHeld) {
+      e.preventDefault();
+      return;
+    }
+    if (plain && (e.key === 'e' || e.key === 'E') && !e.shiftKey && !e.repeat && view.state) {
+      e.preventDefault();
+      call('setMode', view.state.mode === 'select' ? 'interact' : 'select');
+      return;
+    }
+    if (plain && e.key === ' ' && !e.repeat && view.state && view.state.mode === 'select') {
+      e.preventDefault();
+      spaceHeld = true;
+      call('holdInteract', true);
+      return;
+    }
     if (mod && e.key.toLowerCase() === 'z') {
       e.preventDefault();
       // 입력 중인 필드는 갱신을 건너뛰므로, 되돌리기 전에 포커스를 풀어 값이 갱신되게 한다.
@@ -614,7 +821,9 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
   function update(state) {
     view.state = state;
     if (state.tree && els.tree) renderTree(state.tree, state.treeTruncated);
+    view.modifiedIds = new Set((state.diff || []).map((d) => d.id));
     renderSelection(state.selection);
+    if (els.tree) applyTreeVisibility();
     highlightTreeRow();
     renderChanges(state);
     renderDiff(state);

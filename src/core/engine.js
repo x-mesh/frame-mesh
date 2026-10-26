@@ -122,7 +122,7 @@ const pxLimit = (value, fallback) => (/px$/.test(value) ? parseFloat(value) : fa
 
 // initialMode 'interact'는 패널이 붙기 전까지 페이지를 건드리지 않는 대기 상태다. blockNavigation은 iframe 미리보기처럼 이탈을 막아야 할 때만 켠다.
 // rasterViaImage: 스크립트가 차단된 sandbox iframe 안에서는 canvas가 화면에 합성되지 않아, 그린 결과를 img로 옮겨 보여 준다.
-export function createEngine({ doc, win, source = '', onChange = () => {}, onNotice = () => {}, getViewport, viewportLabel, autoScroll, initialMode = 'select', blockNavigation = true, rasterViaImage = false }) {
+export function createEngine({ doc, win, source = '', onChange = () => {}, onNotice = () => {}, getViewport, viewportLabel, autoScroll, initialMode = 'select', blockNavigation = true, rasterViaImage = false, modeKeys = () => true }) {
   const state = {
     mode: initialMode,
     moveMode: 'flow',
@@ -138,6 +138,9 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     peek: false,
     diffView: false,
     editing: null,
+    hold: null,
+    // 속성을 처음 바꾸기 직전의 계산값. 패널에서 "원래 → 지금"을 보여 주는 데만 쓴다.
+    origins: new Map(),
     typeInv: null,
     preview: null,
     xrayRaf: 0,
@@ -1217,6 +1220,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function installHooks() {
     doc.documentElement.setAttribute('data-fm-mode', state.mode);
     listen(doc, 'keydown', onKeydown, true);
+    listen(doc, 'keyup', onKeyup, true);
+    listen(win, 'blur', () => holdInteract(false));
     listen(doc, 'pointerdown', onPointerDown, true);
     listen(doc, 'pointermove', onPointerMove, true);
     listen(doc, 'pointerup', onPointerUp, true);
@@ -1461,6 +1466,13 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     if (!el) {
       onNotice(`대상 요소를 찾지 못해 변경을 적용하지 않았습니다: ${op.label}`);
       return;
+    }
+    if (op.kind === 'style' || op.kind === 'styles') {
+      const cs = win.getComputedStyle(el);
+      (op.kind === 'style' ? [op.prop] : Object.keys(op.after)).forEach((p) => {
+        const key = `${op.target}|${p}`;
+        if (!state.origins.has(key)) state.origins.set(key, cs.getPropertyValue(p));
+      });
     }
     if (op.kind === 'style') writeStyle(el, op.prop, op.after);
     else if (op.kind === 'styles') Object.entries(op.after).forEach(([p, v]) => writeStyle(el, p, v));
@@ -2032,8 +2044,58 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     return target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
   }
 
+  // 모드 단축키를 받을지. 글자를 입력하는 중이면 넘긴다. 초점이 버튼에 있어도 받는다:
+  // Space를 떼는 keyup을 막으므로, 방금 누른 도크 버튼이 다시 눌리지 않는다.
+  function modeKeyTarget(e) {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || !modeKeys()) return false;
+    return !(state.editing || isEditable(e.composedPath()[0]));
+  }
+
+  // Space를 누르는 동안만 페이지를 쓴다. 손을 떼면 선택과 보기 표시를 그대로 되살린다.
+  function holdInteract(on) {
+    if (on) {
+      if (state.hold || state.mode !== 'select') return;
+      state.hold = { selectedId: state.selectedId, measure: state.measure, xray: state.xray, focus: state.focus, diffView: state.diffView };
+      setMode('interact');
+      return;
+    }
+    const h = state.hold;
+    if (!h) return;
+    state.hold = null;
+    setMode('select');
+    if (h.measure) setMeasure(true);
+    if (h.xray) setXray(true);
+    if (h.focus) setFocus(true);
+    if (h.diffView) setDiffView(true);
+    if (h.selectedId && byId(h.selectedId)) select(h.selectedId);
+  }
+
+  function onKeyup(e) {
+    if (e.key === ' ' && state.hold) {
+      e.preventDefault();
+      e.stopPropagation();
+      holdInteract(false);
+    }
+  }
+
   function onKeydown(e) {
+    if (e.key === ' ' && state.hold) {
+      e.preventDefault();
+      return;
+    }
+    if ((e.key === 'e' || e.key === 'E') && !e.shiftKey && !e.repeat && modeKeyTarget(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      holdInteract(false);
+      setMode(state.mode === 'select' ? 'interact' : 'select');
+      return;
+    }
     if (state.mode !== 'select') return;
+    if (e.key === ' ' && !e.repeat && modeKeyTarget(e)) {
+      e.preventDefault();
+      holdInteract(true);
+      return;
+    }
     if (state.editing && inEditing(e)) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -2141,7 +2203,27 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       editable: isTextLeaf(el),
       editing: !!(state.editing && state.editing.id === el.dataset.fmId),
       fields,
+      snippet: treeMeta(el),
+      changes: selectionChanges(el.dataset.fmId),
     };
+  }
+
+  // 선택 요소에서 원본과 달라진 속성. before는 처음 바꾸기 직전 값(계산값), beforeInline은 되돌릴 때 쓸 인라인 값이다.
+  function selectionChanges(id) {
+    const props = new Map();
+    flatten(applied()).forEach((op) => {
+      if (op.target !== id) return;
+      const record = (prop, before, after) => {
+        if (!props.has(prop)) props.set(prop, { prop, beforeInline: before || '', after: after || '' });
+        else props.get(prop).after = after || '';
+      };
+      if (op.kind === 'style') record(op.prop, op.before, op.after);
+      else if (op.kind === 'styles') Object.keys(op.after).forEach((p) => record(p, op.before[p], op.after[p]));
+      else if (op.kind === 'text') record('문구', op.before, op.after);
+    });
+    return [...props.values()]
+      .filter((c) => c.beforeInline !== c.after)
+      .map((c) => ({ ...c, before: c.prop === '문구' ? c.beforeInline : (c.beforeInline || state.origins.get(`${id}|${c.prop}`) || '') }));
   }
 
   function buildTree() {
@@ -2166,6 +2248,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       source,
       elementCount: state.elementCount,
       mode: state.mode,
+      holding: !!state.hold,
       moveMode: state.moveMode,
       measure: state.measure,
       xray: state.xray,
@@ -2224,7 +2307,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   return {
-    init, destroy, select, selectParent, setMode, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
+    init, destroy, select, selectParent, setMode, holdInteract, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
     undo: () => { ensureLive(); history.undo(); }, redo: () => { ensureLive(); history.redo(); }, goto: (n) => { ensureLive(); history.goto(n); },
     setPeek, getDiff, setDiffView, editText,
     previewProposal, acceptProposal, rejectProposal, getChatContext,

@@ -37,21 +37,58 @@ button { cursor: pointer; }
 
 /* 레이어 트리 */
 .tree { overflow: auto; padding: 4px 0; }
-.tree__row { display: flex; align-items: center; gap: 6px; height: 24px; padding-left: calc(10px + var(--depth, 0) * 12px); padding-right: 8px; white-space: nowrap; cursor: default; position: relative; }
+.tree__row { display: flex; align-items: center; gap: 4px; height: 24px; padding-left: calc(4px + var(--depth, 0) * 10px); padding-right: 8px; white-space: nowrap; cursor: default; position: relative; }
 .tree__row:hover { background: #f4f4f7; }
 .tree__row.is-selected { background: var(--accent-soft); }
 .tree__tag { font-family: var(--mono); font-size: 11px; color: var(--ink); }
 .tree__meta { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.tree__row[hidden] { display: none; }
+.tree__caret { flex: none; width: 14px; text-align: center; color: var(--ink-3); font-size: 10px; cursor: pointer; border-radius: 3px; }
+.tree__caret:hover { background: var(--line); color: var(--ink); }
+/* 바뀐 요소는 레이어에서도 주황 점, 접힌 행 안에 바뀐 요소가 있으면 펼침 표시를 주황으로 칠한다. */
+.tree__row.is-modified .tree__tag::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 4px; border-radius: 50%; background: var(--modified); vertical-align: middle; }
+.tree__row.has-modified .tree__caret { color: var(--modified); font-weight: 700; }
 .tree__more { padding: 8px 12px; color: var(--ink-3); }
 .tree__row.is-drop-inside { box-shadow: inset 0 0 0 2px var(--accent); }
-.tree__row.is-drop-before::before, .tree__row.is-drop-after::after { content: ""; position: absolute; left: calc(10px + var(--depth, 0) * 12px); right: 8px; height: 2px; background: var(--accent); }
+.tree__row.is-drop-before::before, .tree__row.is-drop-after::after { content: ""; position: absolute; left: calc(4px + var(--depth, 0) * 10px); right: 8px; height: 2px; background: var(--accent); }
 .tree__row.is-drop-before::before { top: -1px; }
 .tree__row.is-drop-after::after { bottom: -1px; }
 .tree__row.is-dragging { opacity: 0.4; }
 
 /* 속성 */
 .props { overflow: auto; }
-.props__empty { padding: 16px 12px; color: var(--ink-3); }
+.props__empty { padding: 16px 12px; color: var(--ink-2); }
+.props__empty-title { margin: 0 0 10px; font-weight: 600; color: var(--ink); }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0; font-size: 12px; }
+.keys dt { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.keys dd { margin: 0; color: var(--ink-2); }
+.props__head { position: sticky; top: 0; z-index: 2; padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.props__head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.props__badge { flex: none; padding: 1px 8px; border-radius: 999px; background: #fff4e5; color: #9a4b00; font-size: 11px; font-weight: 600; }
+.props__badge[hidden], .props__snippet[hidden], .props__section[hidden] { display: none; }
+.props__snippet { margin-top: 2px; color: var(--ink-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.props__head-row .props__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.props__head-actions { display: flex; gap: 4px; flex: none; }
+.props__head-actions .btn { padding: 2px 8px; font-size: 11px; }
+.props__head .crumbs { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; margin-top: 6px; scrollbar-width: none; }
+.props__head .crumbs::-webkit-scrollbar { display: none; }
+.props__changes { background: #fffbf2; }
+.change-list { display: flex; flex-direction: column; gap: 4px; }
+.change-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) 18px; align-items: center; gap: 6px; }
+.change-item__label { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.change-item__values { display: flex; gap: 4px; min-width: 0; font-family: var(--mono); font-size: 11px; overflow: hidden; white-space: nowrap; }
+.change-item__before { color: var(--ink-3); text-decoration: line-through; overflow: hidden; text-overflow: ellipsis; }
+.change-item__arrow { color: var(--ink-3); flex: none; }
+.change-item__after { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.change-item__undo { border: 0; background: none; padding: 0; color: var(--ink-3); cursor: pointer; font-size: 13px; }
+.change-item__undo:hover { color: var(--ink); }
+.props__group-title { width: 100%; border: 0; background: none; padding: 0; cursor: pointer; text-align: left; font: inherit; font-weight: 600; color: var(--ink-2); }
+.props__group-title:hover { color: var(--ink); }
+.props__caret { display: inline-block; width: 14px; color: var(--ink-3); font-size: 10px; }
+.props__group-count { color: #9a4b00; font-weight: 600; font-size: 11px; }
+.props__group.is-collapsed { padding-top: 8px; padding-bottom: 8px; }
+.props__group.is-collapsed .props__group-title { margin-bottom: 0; }
+.props__group.is-collapsed .fields { display: none; }
 .props__title { font-family: var(--mono); font-size: 12px; font-weight: 600; word-break: break-all; }
 .props__dims { color: var(--ink-2); font-family: var(--mono); font-size: 11px; margin-top: 2px; }
 .props__section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
@@ -74,7 +111,10 @@ button { cursor: pointer; }
 .field input, .field select { min-width: 0; width: 100%; padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fafafc; font-family: var(--mono); font-size: 11px; }
 .field input[type="color"] { padding: 0 2px; height: 24px; }
 .field input:focus, .field select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-.field.is-modified input, .field.is-modified select { border-color: var(--modified); background: #fffbf2; }
+.field.is-modified input, .field.is-modified select { border-color: var(--modified); background: #fffbf2; color: var(--ink); font-weight: 600; }
+/* 직접 바꾸지 않은 값은 페이지가 계산한 값이므로 흐리게, 바꾼 값은 진하게 보인다. */
+.field:not(.is-modified) select { color: var(--ink-3); }
+.field input::placeholder { color: var(--ink-3); }
 .field__dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; justify-self: center; }
 .field.is-modified .field__dot { background: var(--modified); }
 .field__reset { border: 0; background: none; color: var(--ink-3); padding: 0; visibility: hidden; line-height: 1; }

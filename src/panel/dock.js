@@ -12,6 +12,22 @@ const DOCK_CSS = `
 :host([hidden]) { display: none; }
 .dock { position: fixed; left: 0; right: 0; bottom: 0; height: var(--dock-h); display: flex; flex-direction: column; background: var(--panel); color: var(--ink); border-top: 1px solid var(--line); box-shadow: 0 -6px 24px rgba(0,0,0,0.12); font: 12px/1.45 var(--font); z-index: 2147483647; }
 .dock.is-collapsed { height: auto; }
+/* 되돌리기는 자주 쓰므로 글자와 함께 진하게 보이고, 누를 수 없을 때만 흐리게 한다. */
+.btn--history { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-weight: 600; }
+.btn--history .btn__glyph { font-size: 15px; line-height: 1; }
+.btn--reset:not(:disabled) { color: #b42318; border-color: #f3c3bd; }
+.btn--reset:not(:disabled):hover { background: #fef3f2; }
+.btn--history:disabled { color: var(--ink-3); font-weight: 400; opacity: 0.6; }
+/* 편집 중에는 위 테두리를 파란색으로 칠해 버튼을 보지 않아도 모드를 알 수 있게 한다. */
+.dock.is-editing { border-top: 3px solid var(--accent); }
+.mode-switch { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: #f1f1f4; color: var(--ink-2); font: 600 12px/1.2 var(--font); cursor: pointer; }
+.mode-switch__track { position: relative; width: 30px; height: 18px; border-radius: 999px; background: #c4c4cc; transition: background 0.12s; flex: none; }
+.mode-switch__track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 0.12s; }
+.mode-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mode-switch[aria-checked="true"] .mode-switch__track { background: rgba(255,255,255,0.35); }
+.mode-switch[aria-checked="true"] .mode-switch__track::after { transform: translateX(12px); }
+.mode-switch kbd { font: 11px var(--mono); padding: 0 4px; border-radius: 3px; background: rgba(0,0,0,0.08); }
+.mode-switch[aria-checked="true"] kbd { background: rgba(255,255,255,0.25); }
 .dock.is-collapsed .changes, .dock.is-collapsed .dock__grip, .dock.is-collapsed .dock__status { display: none; }
 .dock__grip { height: 6px; cursor: ns-resize; flex: none; }
 .dock__grip:hover, .dock__grip.is-active { background: var(--accent-soft); }
@@ -125,7 +141,8 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   });
   doc.addEventListener('click', (e) => { if (!e.composedPath().includes(host)) menus.forEach((m) => { m.hidden = true; }); }, true);
 
-  const modeSeg = el('div', { class: 'seg', id: 'modeSeg', title: '선택: 요소를 고르고 편집 · 동작: 페이지를 원래대로 사용' }, [segBtn('data-mode', 'select', '선택', true), segBtn('data-mode', 'interact', '동작')]);
+  const modeLabel = el('span', { text: '편집 중' });
+  const modeToggle = el('button', { class: 'mode-switch', id: 'modeToggle', type: 'button', role: 'switch', 'aria-checked': 'true', title: '켜면 요소를 고르고 편집합니다. 끄면 페이지를 원래대로 씁니다. E: 전환 · Space를 누르는 동안: 잠깐 페이지 사용' }, [el('span', { class: 'mode-switch__track' }), modeLabel, el('kbd', { text: 'E' })]);
   const moveSeg = el('div', { class: 'seg', id: 'moveSeg', title: '⌥(Option)을 누른 채 끌면 반대 방식으로 움직입니다.' }, [segBtn('data-move', 'flow', '흐름 이동', true), segBtn('data-move', 'free', '자유 위치')]);
   const btnMeasure = menuItem('btnMeasure', '측정', '눈금자·가이드·좌표·거리 표시');
   const btnXray = menuItem('btnXray', '분해', '화면 안 모든 요소의 영역과 이름을 한꺼번에 표시');
@@ -137,8 +154,12 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     el('div', { class: 'menu__label', text: '드래그 방식' }), el('div', { class: 'menu__seg' }, [moveSeg]),
   ]);
   const btnPeek = btn('btnPeek', '원본 보기', '변경을 지우지 않고 잠시 걷어 내 원래 화면 보기 (Esc로 돌아가기)');
-  const btnUndo = btn('btnUndo', '↶', '실행 취소 (⌘Z)', ' icon');
-  const btnRedo = btn('btnRedo', '↷', '다시 실행 (⇧⌘Z)', ' icon');
+  const historyBtn = (id, glyph, text, title) => el('button', { class: 'btn btn--history', id, type: 'button', title }, [el('span', { class: 'btn__glyph', text: glyph }), el('span', { text })]);
+  const btnUndo = historyBtn('btnUndo', '↶', '되돌리기', '방금 한 변경 되돌리기 (⌘Z)');
+  const btnRedo = historyBtn('btnRedo', '↷', '다시 실행', '되돌린 변경 다시 적용 (⇧⌘Z)');
+  const btnReset = historyBtn('btnReset', '⟲', '처음 상태로', '모든 변경을 한 번에 걷어 페이지를 처음 상태로 되돌립니다. 로그는 남으므로 "다시 실행"으로 하나씩 복구할 수 있습니다.');
+  btnReset.classList.add('btn--reset');
+  btnReset.disabled = true;
   btnUndo.disabled = true;
   btnRedo.disabled = true;
   const changeCount = el('span', { id: 'changeCount' });
@@ -155,7 +176,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const moreMenu = menu('⋯', '저장과 지우기', 'right', [btnSendLog, btnHandoff, el('div', { class: 'menu__div' }), btnClearLog]);
   const btnCollapse = btn('btnCollapse', '▾', '로그 접기/펼치기', ' icon');
   const bar = el('div', { class: 'dock__bar' }, [
-    el('div', { class: 'dock__group' }, [el('span', { class: 'brand', text: 'frame-mesh' }), modeSeg, viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo]),
+    el('div', { class: 'dock__group' }, [modeToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset]),
     el('div', { class: 'dock__group' }, [applied, tabs, btnCopyLog, moreMenu, btnCollapse]),
   ]);
   const grip = el('div', { class: 'dock__grip', title: '끌어서 높이 조절' });
@@ -213,7 +234,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
 
   const panel = createPanel({
     els: {
-      tree: el('div'), props: el('div'), changes, diff: diffView, btnPeek, btnDiffView, changeCount, btnUndo, btnRedo, modeSeg, moveSeg,
+      tree: el('div'), props: el('div'), changes, diff: diffView, btnPeek, btnDiffView, changeCount, btnUndo, btnRedo, btnReset, modeToggle, modeLabel, moveSeg,
       btnHandoff, btnCopyLog, btnSendLog, btnClearLog, btnMeasure, btnXray, btnFocus, notice,
       handoff: { dialog, text: handoffText, summary: handoffSummary, btnCopy: btnHandoffCopy, btnMd: btnHandoffMd, btnJson: btnHandoffJson, btnClose: btnHandoffClose, receiverInput },
     },
@@ -288,10 +309,11 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
 
   function update(state) {
     lastState = state;
+    dock.classList.toggle('is-editing', state.mode === 'select');
     renderApplied();
     panel.update({ ...state, tree: undefined });
     status.textContent = `${state.source} · 요소 ${state.elementCount}개 · 조작 안내 ⓘ`;
-    status.title = '클릭: 상자 선택 · 더블클릭: 한 단계 안으로 · ⌘클릭: 가장 깊은 요소 · 우클릭: 겹친 요소 목록 · ⌥드래그: 반대 이동 방식 · 방향키: 1px 이동 · Esc: 선택 해제';
+    status.title = 'E: 편집 켜기·끄기 · Space를 누르는 동안: 잠깐 페이지 사용 · 클릭: 상자 선택 · 더블클릭: 한 단계 안으로 · ⌘클릭: 가장 깊은 요소 · 우클릭: 겹친 요소 목록 · ⌥드래그: 반대 이동 방식 · 방향키: 1px 이동 · Esc: 선택 해제';
   }
 
   // 패널이 닫히면 도크는 숨기되, 적용 중인 변경이 있으면 알약을 남긴다.
