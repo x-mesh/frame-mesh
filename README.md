@@ -1,130 +1,161 @@
 # frame-mesh
 
-웹 페이지의 요소를 Figma처럼 골라서 옮기고 크기·여백·글자를 바꾼 뒤, 바뀐 내용을 LLM이 원본 코드에 반영할 수 있는 묶음으로 넘기는 도구입니다. 화면을 보며 직접 조정하고, 코드 수정은 AI 코딩 에이전트에게 맡기는 흐름을 위해 만들었습니다.
+English | [한국어](README.ko.md)
 
-두 가지 방식으로 씁니다.
+frame-mesh lets you edit a live web page like a design tool. Select an element, then move it, resize it, or change its spacing, text, and color. frame-mesh records each change, shows a diff against the original page, and packs the result into a handoff for an AI coding agent. The agent applies the handoff to your source code.
 
-- **웹 작업실**: 정적 HTML 시안을 열어 데스크톱·태블릿·모바일 폭으로 보며 편집합니다.
-- **Chrome 확장**: 지금 보고 있는 실제 페이지(로컬 개발 서버나 일반 웹사이트)를 그 자리에서 편집합니다.
+1. Select an element and change it on the page.
+2. Check the change log and the diff.
+3. Send the handoff to an agent, or chat with the agent from the page.
 
-편집은 페이지의 인라인 스타일과 DOM 순서만 바꾸며, 원본 소스 파일은 건드리지 않습니다. 원본 반영은 전달 묶음을 받은 에이전트가 맡습니다.
+frame-mesh has two hosts. Both use the same editor engine.
 
-## 준비
+- **Web workbench**: open a static HTML mockup and edit it at desktop, tablet, and mobile widths.
+- **Chrome extension**: edit the page in the current tab, for example a local dev server or a public website.
 
-- Python 3 (개발 서버. 추가 패키지는 필요 없습니다)
-- Node.js (`make check`의 문법 검사에만 씁니다)
-- Chrome 116 이상 또는 같은 버전대의 Chromium 계열 브라우저 (확장)
+frame-mesh changes only inline styles and the DOM order in the browser. It does not write to your source files.
 
-npm 의존성이나 빌드 단계는 없습니다.
+> [!NOTE]
+> The user interface is in Korean. This README gives each label in Korean with an English translation, for example "LLM용 복사" (Copy for LLM).
 
-## 웹 작업실로 시작하기
+## Requirements
+
+- Python 3 for the development server. The server needs no extra packages.
+- Node.js for the syntax check in `make check` only.
+- Chrome 116 or later, or a Chromium browser of the same version, for the extension.
+
+The project has no npm dependencies and no build step.
+
+## Start with the web workbench
 
 ```bash
 make dev
 ```
 
-브라우저에서 `http://127.0.0.1:4173/index.html`을 엽니다. 예제 시안(`fixtures/sample-plan.html`)이 바로 열리고, 왼쪽에 레이어, 가운데에 미리보기, 오른쪽에 속성 패널이 보이면 준비된 것입니다. 다른 HTML은 상단의 "HTML 열기"로 엽니다.
+Open `http://127.0.0.1:4173/index.html`. The sample mockup `fixtures/sample-plan.html` opens. If you see layers on the left, the preview in the center, and properties on the right, the workbench is ready. To open a different file, click "HTML 열기" (Open HTML) at the top.
 
-`file://`로 열면 시안을 불러오지 못하므로 반드시 `make dev`로 띄운 주소를 씁니다. 포트는 `make dev PORT=5000`처럼 바꿀 수 있습니다.
+Use the `make dev` address. If you open the file through `file://`, the workbench cannot load the mockup. To change the port, run `make dev PORT=5000`.
 
-## Chrome 확장으로 시작하기
+## Start with the Chrome extension
 
-1. `chrome://extensions`에서 "개발자 모드"를 켭니다.
-2. "압축해제된 확장 프로그램을 로드합니다"를 누르고 이 저장소의 **루트 폴더**를 고릅니다. 공용 엔진(`src/core/`)을 함께 읽어야 해서 `manifest.json`이 루트에 있습니다.
-3. 편집할 페이지에서 툴바의 frame-mesh 아이콘을 눌러 사이드 패널을 엽니다.
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Click **Load unpacked** and select the **root folder** of this repository. The extension loads the shared engine in `src/core/`, so `manifest.json` is in the root.
+3. On the page to edit, click the frame-mesh icon in the toolbar. The side panel opens.
 
-패널이 열리면 페이지 아래에 도크가 나타나고, 페이지를 클릭하면 요소가 선택됩니다. 사이드 패널은 지금 보는 탭을 따라가며 레이어와 속성을 보여 주고, 도구 모음·변경 로그·전달 버튼은 페이지 아래 도크에 있습니다. 패널을 닫으면 페이지는 원래대로 동작합니다.
+When the side panel opens, a dock appears at the bottom of the page. Click an element on the page to select it. The side panel follows the active tab and shows layers and properties. The dock holds the tools, the change log, and the handoff buttons. When you close the side panel, the page works normally again.
 
-확장은 모든 사이트 접근 권한(`<all_urls>`)을 요청합니다. 실제로 페이지에 들어가는 것은 사이드 패널이 열려 있을 때 그 창의 활성 탭뿐입니다.
+The extension requests access to all sites (`<all_urls>`). It injects code only into the active tab of the window with the open side panel.
 
-## 편집하기
+## Edit a page
 
-| 조작 | 동작 |
+| Input | Result |
 |---|---|
-| 클릭 | 눈에 보이는 상자 단위로 선택합니다. 링크용 투명 가리개는 건너뜁니다 |
-| 더블클릭 | 선택한 요소의 한 단계 안쪽을 선택합니다. 글자만 있는 요소에서는 문구 편집을 시작합니다 |
-| ⌘클릭 (Windows는 Ctrl) | 가장 깊은 요소를 선택합니다 |
-| 우클릭 | 그 지점에 겹친 요소 목록에서 고릅니다 |
-| 드래그 | 같은 레이아웃 흐름 안에서 순서나 부모를 바꿉니다. ⌥(Option)을 누른 채 끌면 `position: relative` 오프셋으로 옮깁니다 |
-| 선택 상자의 핸들 | 너비·높이를 바꿉니다. 모서리 핸들은 Shift를 누르면 비율을 유지합니다 |
-| 방향키 | 1px씩 옮깁니다. Shift를 누르면 10px씩 옮깁니다 |
-| Enter | 글자만 있는 요소의 문구를 그 자리에서 고칩니다. Enter로 확정, Esc로 취소합니다 |
-| ⌘Z / ⇧⌘Z | 실행 취소 / 다시 실행 |
+| Click | Selects the visible box under the pointer. It skips transparent link overlays. |
+| Double-click | Selects one level deeper. On a text-only element, it starts a text edit. |
+| ⌘-click (Ctrl-click on Windows) | Selects the deepest element. |
+| Right-click | Shows a list of all elements at that point. |
+| Drag | Changes the order or the parent in the same layout flow. Hold ⌥ (Option) to move the element with a `position: relative` offset. |
+| Handles on the selection box | Change the width and height. Hold Shift on a corner handle to keep the aspect ratio. |
+| Arrow keys | Move the element 1px. Hold Shift to move it 10px. |
+| Enter | Starts a text edit on a text-only element. Press Enter to keep the text, or Esc to cancel. |
+| ⌘Z / ⇧⌘Z | Undo / redo. |
+| E | Switches between edit mode and normal page use. The extension accepts E only while the side panel is open. |
+| Hold Space | Lets you use the page for a moment. Release Space to return to edit mode with the same selection and overlays. |
 
-속성 패널에서는 패딩, 마진, 크기, 위치, 글꼴, 글자 크기(페이지가 쓰는 크기 단계 포함), 자간, 줄 높이, 색, 테두리, 배치를 숫자나 선택으로 바꿉니다.
+In edit mode, frame-mesh blocks links and page navigation. A blue top border on the dock shows that edit mode is on. To use the page, turn off the "편집 중" (Edit mode) switch at the left end of the dock, or press E.
 
-"보기" 메뉴(웹 작업실은 상단 버튼)에는 페이지 위에 겹쳐 보는 표시가 있습니다.
+### Property panel
 
-- **측정**: 눈금자, 선택 요소의 가이드선과 좌표·크기, 다른 요소까지의 거리
-- **분해**: 화면 안 모든 요소의 영역과 이름
-- **집중**: 선택한 요소 밖을 어둡게 가림
-- **차이 표시**: 바뀐 요소의 원래 자리(빨간 점선)와 지금 자리(초록), 이동 화살선, 속성 변화
+The property panel changes padding, margin, size, position, font, font size, letter spacing, line height, color, border, and layout. The font size list includes the size steps that the page uses.
 
-선택 모드에서는 링크와 페이지 이동을 막습니다. 페이지를 실제로 눌러 보려면 "동작" 모드로 바꿉니다.
+- The header always shows the selected element and its number of changes.
+- "바꾼 값" (Changed values) shows the original and the current value of each changed property. Click ↺ to revert one item.
+- Values that you set show in dark text. Values that the page computes show in light text.
+- Property groups open by element type. A group with changes shows its change count.
+- The layer tree expands only the ancestors of the selection. An orange dot marks each changed element.
 
-## 변경 확인과 LLM 전달
+In the extension side panel, drag the bar between layers and properties to change their heights. Double-click the bar to reset it.
 
-변경이 있으면 바뀐 요소에 주황 점선과 번호가 붙고, 도크에 "N건 적용 중", 확장 아이콘에 배지가 표시됩니다. 패널을 닫아도 페이지 오른쪽 아래에 "변경 N건 적용 중" 알림이 남습니다.
+### View overlays
 
-- **로그**: 변경을 일어난 순서대로 보여 줍니다. 항목을 누르면 그 시점까지만 유지합니다.
-- **변경 요약**: 요소별로 처음 값과 최종 값만 diff 형식(`-` / `+`)으로 보여 줍니다.
-- **원본 보기**: 변경을 지우지 않고 잠시 걷어 내 원래 화면을 보여 줍니다. Esc를 누르거나 편집을 시작하면 돌아옵니다.
+The "보기" (View) menu has these overlays. In the web workbench, they are buttons at the top.
 
-변경 로그는 페이지 주소별로 저장되어 새로고침 뒤에도 다시 적용됩니다. 요소를 찾지 못한 변경은 "복원 실패"로 표시하고, 늦게 그려지는 요소는 15초 동안 다시 시도합니다.
+- **측정 (Measure)**: rulers, guides with coordinates and size, and distances to other elements.
+- **분해 (Outline)**: the area and name of each element on the screen.
+- **집중 (Focus)**: a dark mask outside the selected element.
+- **차이 표시 (Diff)**: the original position (red dashes) and the current position (green) of each changed element, a move arrow, and the property changes.
 
-전달은 세 가지 방법이 있습니다.
+## Review changes
 
-- **LLM용 복사**: 변경 목록, diff, 반영 요청 문구, 결과 HTML을 마크다운으로 클립보드에 복사합니다. 페이지가 크면 결과 HTML 대신 바뀐 요소의 HTML만 넣습니다.
-- **프로젝트에 저장**: `make dev` 서버로 보내 `handoffs/` 폴더에 저장합니다.
-- **내용 보기·파일 저장**: 묶음을 확인하고 `.md`나 `.json`으로 내려받습니다.
+Each changed element gets an orange dashed outline and a number. The dock shows "N건 적용 중" (N changes applied), and the extension icon shows a badge. After you close the side panel, a "변경 N건 적용 중" notice stays at the lower right of the page.
 
-"프로젝트에 저장"을 쓰면 에이전트에게 이렇게 맡길 수 있습니다.
+- **로그 (Log)**: lists the changes in order. Click an entry to keep only the changes up to that point.
+- **변경 요약 (Summary)**: shows the first and the last value of each element as a diff (`-` / `+`).
+- **원본 보기 (Show original)**: removes the changes for a moment and shows the original page. Press Esc or start an edit to go back.
+- **처음 상태로 (Reset)**: removes all changes at once. The log stays, so redo can restore the changes one by one. To clear the log too, open the ⋯ menu in the dock and select "모두 되돌리고 로그 지우기" (Revert all and clear log).
+
+frame-mesh saves the change log for each page URL and applies it again after a reload. If frame-mesh cannot find an element, the change shows as "복원 실패" (Restore failed). For elements that render late, frame-mesh tries again for 15 seconds.
+
+## Hand off changes to an agent
+
+The dock has three handoff actions.
+
+- **LLM용 복사 (Copy for LLM)**: copies a Markdown handoff to the clipboard. The handoff contains the change list, the diff, a request to apply the changes, and the result HTML. For a large page, it contains only the HTML of the changed elements.
+- **프로젝트에 저장 (Save to project)**: sends the handoff to the `make dev` server. The server writes it to `handoffs/`.
+- **내용 보기·파일 저장 (View and save file)**: shows the handoff and downloads it as `.md` or `.json`.
+
+After "프로젝트에 저장", give the agent a request like this one:
 
 ```text
-handoffs/latest.md 반영해줘
+Apply handoffs/latest.md to the source.
 ```
 
-## AI 에이전트와 대화하기
+## Chat with an agent
 
-도크(웹 작업실은 하단)의 "대화" 탭에서 이 프로젝트 폴더에서 실행 중인 AI 코딩 에이전트 세션에 요청을 보냅니다. frame-mesh가 에이전트를 새로 띄우지는 않습니다. 보낼 때 선택한 요소, 주요 스타일, 적용 중인 diff가 함께 갑니다.
+The "대화" (Chat) tab sends requests to an AI coding agent session that runs in this project folder. The tab is in the dock, or in the bottom panel of the web workbench. frame-mesh does not start an agent. Each request includes the selected element, its main styles, and the current diff.
 
-에이전트는 frame-mesh MCP 도구로 답합니다. 저장소의 `.mcp.json`에 `frame-mesh` 서버(`tools/fm_mcp.py`)를 등록해 두었으므로, 이 파일을 읽는 에이전트는 이 폴더에서 열면 서버를 씁니다. 이 파일을 읽지 않는 에이전트에는 `python3 tools/fm_mcp.py`를 stdio MCP 서버로 직접 등록합니다.
+The agent answers through the frame-mesh MCP tools. `.mcp.json` registers the `frame-mesh` server (`tools/fm_mcp.py`). An agent that reads `.mcp.json` uses this server when you open it in this folder. For other agents, register `python3 tools/fm_mcp.py` as a stdio MCP server.
 
-| 도구 | 하는 일 |
+| Tool | Purpose |
 |---|---|
-| `fm_get_state` | 선택 요소, 적용 중인 diff, 보낸 제안의 수락 여부를 읽습니다 |
-| `fm_reply` | 대화창에 글로 답합니다 |
-| `fm_propose` | 화면 변경을 이유와 함께 제안합니다. 사용자가 미리보고 수락해야 적용됩니다 |
-| `fm_wait_request` | 외부 전달 명령이 없을 때 대화창의 다음 요청을 기다립니다 |
+| `fm_get_state` | Reads the selection, the current diff, and the status of each sent proposal. |
+| `fm_reply` | Writes a text answer in the chat. |
+| `fm_propose` | Proposes a screen change with a reason. The change applies only after the user previews and accepts it. |
+| `fm_wait_request` | Waits for the next chat request. Use it when no relay command is set. |
 
-요청을 전달하는 방식은 상황에 따라 정해지고, 대화 탭 위에 표시됩니다.
+frame-mesh selects one of three delivery modes and shows it above the chat tab.
 
-- **자동 전달**: 외부 전달 명령(아래)을 설정했고 그 명령이 이 폴더의 에이전트 세션을 찾으면, 요청이 그 세션에 바로 도착합니다. 세션이 여럿이면 대화 탭에서 고릅니다.
-- **에이전트 대기 중**: 에이전트에게 "frame-mesh 대화 받아 줘"라고 말해 두면, 에이전트가 `fm_wait_request`로 요청을 기다렸다가 받아 갑니다. 기다리는 동안 다시 부를 때마다 모델 호출이 생깁니다.
-- **수동 전달**: 둘 다 아니면 요청을 대기열에 넣어 둡니다. 에이전트가 대기를 시작하면 그때 받아 가고, "LLM용 복사"나 `handoffs/`도 그대로 쓸 수 있습니다.
+- **Relay**: if a relay command is set (see below) and it finds an agent session in this folder, the request goes to that session directly. If there is more than one session, select one in the chat tab.
+- **Agent wait**: tell the agent to wait for frame-mesh chat requests. The agent calls `fm_wait_request` and takes the next request. Each new wait call is one more model call.
+- **Manual**: if neither mode applies, the request stays in a queue. The agent takes it when it starts to wait. "LLM용 복사" and `handoffs/` also work in this mode.
 
-제안은 이유와 함께 카드로 도착합니다. "미리보기"로 페이지에 적용해 보고, "수락"하면 한 덩어리로 변경 로그에 들어가며 실행 취소 한 번에 되돌릴 수 있습니다. "원본에 반영"을 누르면 전달 묶음을 `handoffs/latest.md`에 저장한 뒤 원본 소스에 반영해 달라고 요청합니다. 소스 파일 수정은 이 버튼을 눌렀을 때만 요청합니다.
+A proposal arrives as a card with its reason. Click "미리보기" (Preview) to apply it to the page. Click "수락" (Accept) to add it to the change log as one entry, which one undo removes. Click "원본에 반영" (Apply to source) to save the handoff to `handoffs/latest.md` and ask the agent to apply it to the source. frame-mesh asks for source edits only when you click this button.
 
-### 외부 전달 명령
+### Relay command
 
-자동 전달은 개발 서버를 띄울 때 환경 변수로 지정한 명령을 씁니다. 명령은 아래 규약을 따라야 합니다.
+For relay mode, set the command in environment variables when you start the development server.
 
 ```bash
-FRAME_MESH_RELAY_CMD="<명령>" FRAME_MESH_RELAY_ARGS="<공통 인자>" make dev
+FRAME_MESH_RELAY_CMD="<command>" FRAME_MESH_RELAY_ARGS="<common args>" make dev
 ```
 
-| 호출 | 출력 |
+The command must follow this contract.
+
+| Call | Output |
 |---|---|
-| `<명령> sessions <공통 인자>` | `{"sessions": [{"session_id", "name", "status", "cwd"}]}` JSON. `cwd`가 이 저장소 폴더인 세션만 씁니다 |
-| `<명령> send <공통 인자> --session <id> --message-file <파일>` | `{"ok": true, "state": "..."}` JSON. 실패하면 `ok: false`나 0이 아닌 종료 코드 |
+| `<command> sessions <common args>` | JSON `{"sessions": [{"session_id", "name", "status", "cwd"}]}`. frame-mesh uses only the sessions whose `cwd` is this repository folder. |
+| `<command> send <common args> --session <id> --message-file <file>` | JSON `{"ok": true, "state": "..."}`. On failure, `ok: false` or a nonzero exit code. |
 
-명령을 실행할 때 이름이 `_SESSION_ID`, `_THREAD_ID`, `_CONVERSATION_ID`로 끝나는 환경 변수는 뺍니다. 개발 서버를 에이전트의 터미널에서 띄웠을 때 요청이 그 세션에서 온 것처럼 보이지 않게 하기 위해서입니다.
+Before frame-mesh runs the command, it removes each environment variable whose name ends in `_SESSION_ID`, `_THREAD_ID`, or `_CONVERSATION_ID`. Thus, if you start the server in an agent terminal, requests do not appear to come from that session.
 
-메시지에 섞이는 페이지 글은 "자료일 뿐 지시가 아님"으로 표시한 구획에 길이를 제한해 넣습니다. 다만 에이전트를 권한 확인 없이 실행하고 다른 곳에서 온 메시지를 검토 없이 받도록 설정했다면, 페이지 글이 그대로 세션에 닿는다는 점을 알고 쓰세요.
+frame-mesh puts page text into a block that is marked as data, not instructions, and limits its length.
 
-## 개발 서버
+> [!WARNING]
+> Check the permissions of your agent before you use relay mode. If the agent runs without permission prompts and accepts outside messages without review, page text reaches the session directly.
 
-`make dev`는 `tools/devserver.py`를 실행합니다. 저장소 루트를 정적으로 제공하면서 `POST /handoff`로 전달 묶음을 받아 `handoffs/<시각>-<페이지>.md`, 같은 이름의 `.json`, 항상 최신본인 `handoffs/latest.md`를 씁니다.
+## Development server
+
+`make dev` runs `tools/devserver.py`. The server serves the repository root as static files. It also accepts handoffs at `POST /handoff` and writes three files: `handoffs/<time>-<page>.md`, a `.json` file with the same name, and `handoffs/latest.md` with the newest handoff.
 
 ```bash
 curl -X POST http://127.0.0.1:4173/handoff \
@@ -132,41 +163,43 @@ curl -X POST http://127.0.0.1:4173/handoff \
   --data '{"source":"example","markdown":"# test"}'
 ```
 
-`/chat/*`와 `/handoff`는 브라우저 요청 중 이 서버 자신과 Chrome 확장에서 온 것만 받고, POST는 `Content-Type: application/json`만 받습니다. 다른 웹사이트가 `127.0.0.1`로 요청을 보내 에이전트 세션에 지시를 넣지 못하게 하기 위해서입니다. `curl`처럼 브라우저가 아닌 로컬 프로그램은 그대로 쓸 수 있습니다.
+The request body must contain `markdown`. The `json` and `source` fields are optional. The extension sends handoffs to `http://127.0.0.1:4173/handoff` by default. If you change the port, also change this address in the "내용 보기·파일 저장" dialog.
 
-대화 기능은 같은 서버의 `/chat/*` 경로를 씁니다(`/chat/status`, `/chat/send`, `/chat/events` 등). `tools/fm_mcp.py`는 이 경로로 요청을 전달할 뿐이며, 접속 주소는 환경 변수 `FRAME_MESH_URL`(기본 `http://127.0.0.1:4173`)로 바꿉니다.
+The chat feature uses the `/chat/*` paths on the same server, for example `/chat/status`, `/chat/send`, and `/chat/events`. `tools/fm_mcp.py` only forwards requests to these paths. To change its server address, set `FRAME_MESH_URL`. The default is `http://127.0.0.1:4173`.
 
-요청 본문에는 `markdown`이 반드시 있어야 하고, `json`과 `source`는 선택입니다. 확장의 수신기 주소는 기본값이 `http://127.0.0.1:4173/handoff`입니다. 포트를 바꿨다면 "내용 보기·파일 저장" 대화상자에서 주소를 함께 바꿉니다.
+For `/chat/*` and `/handoff`, the server accepts browser requests only from its own origin and from Chrome extensions. POST requests must use `Content-Type: application/json`. These rules block requests from other websites to `127.0.0.1` that try to put instructions into an agent session. Local programs that are not browsers, such as `curl`, can use these paths.
 
-## make 명령
+## Make targets
 
-| 명령 | 설명 |
+| Target | Action |
 |---|---|
-| `make dev` | 개발 서버 실행 (`PORT`, `HOST` 변경 가능) |
-| `make open` | 기본 브라우저로 작업실 열기 (macOS `open` 사용) |
-| `make check` | JS 문법과 `manifest.json` 검사 |
-| `make test` | 자동 테스트는 아직 없습니다 |
-| `make clean` | `.DS_Store` 정리 |
+| `make dev` | Runs the development server. Set `PORT` and `HOST` to change the address. |
+| `make open` | Opens the workbench in the default browser. It uses the macOS `open` command. |
+| `make check` | Checks the JS syntax and `manifest.json`. |
+| `make test` | Prints a notice. No automated tests exist yet. |
+| `make clean` | Removes `.DS_Store` files. |
+| `make help` | Lists the targets. |
 
-## 구조
+## Project layout
 
 ```text
-src/core/      편집 엔진(선택·이동·크기·이력·측정·diff)과 전달 묶음 생성
-src/panel/     레이어·속성 패널과 확장용 하단 도크
-src/web/       웹 작업실 호스트(iframe 미리보기, 뷰포트)
-extension/     확장의 백그라운드, 콘텐츠 스크립트, 사이드 패널
-tools/         개발 서버, 대화 중계, MCP 서버
-fixtures/      예제 시안(정적, 늦게 그려지는 페이지, 가리개가 있는 카드)
+src/core/      Editor engine (selection, move, resize, history, measure, diff) and handoff builder
+src/panel/     Layer and property panels, and the dock for the extension
+src/web/       Web workbench host (iframe preview, viewports)
+extension/     Extension background script, content script, and side panel
+tools/         Development server, chat relay, and MCP server
+fixtures/      Sample mockups (static page, late render, card with a link overlay)
 ```
 
-웹 작업실과 확장은 같은 엔진을 씁니다. 엔진에 넣은 기능은 두 곳에 함께 적용됩니다.
+The web workbench and the extension use the same engine. A feature in the engine works in both hosts.
 
-## 알려진 한계
+## Known limitations
 
-- 편집 결과는 인라인 스타일이므로, 원본 CSS나 컴포넌트 코드로 옮기는 일은 전달 묶음을 받은 에이전트가 해야 합니다.
-- React처럼 화면을 다시 그리는 앱은 적용한 변경을 덮어쓸 수 있습니다. 이때는 다시 적용을 시도하고, 실패하면 "복원 실패"로 남깁니다.
-- 원래 값이 CSS 규칙에서 온 속성은 diff에 `(기본)`으로 표시합니다.
-- 다른 출처의 iframe(광고 등) 안쪽은 편집할 수 없고, iframe 자체만 하나의 요소로 다룹니다.
-- 뷰포트별(미디어 쿼리) 규칙은 만들지 않습니다. 모든 변경은 모든 폭에 공통으로 적용됩니다.
+- Edits are inline styles. The agent that receives the handoff must move them into the source CSS or component code.
+- Apps that render the page again, such as React apps, can overwrite applied changes. frame-mesh then tries to apply them again. If that fails, the change shows as "복원 실패".
+- If an original value comes from a CSS rule, the diff shows it as `(기본)` (default).
+- "바꾼 값" uses the computed value just before the first change as the original value. Text changes have no ↺ button.
+- frame-mesh cannot edit inside a cross-origin iframe, such as an ad. It treats the iframe as one element.
+- frame-mesh does not create rules for each viewport (media queries). Each change applies at all widths.
 
-설계 배경과 요구사항은 [UI-UX-WORKBENCH-REQUIREMENTS.md](UI-UX-WORKBENCH-REQUIREMENTS.md)에 있습니다.
+The design background and requirements are in [UI-UX-WORKBENCH-REQUIREMENTS.md](UI-UX-WORKBENCH-REQUIREMENTS.md) (Korean).
