@@ -3,3 +3,5 @@ handoffs/
 __pycache__/
 *.pyc
 .DS_Store
+.demo-frames/
+dist/

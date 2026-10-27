@@ -8,7 +8,7 @@ URL  := http://$(HOST):$(PORT)/index.html
 JS   := $(wildcard src/*/*.js extension/*.js)
 
 .DEFAULT_GOAL := help
-.PHONY: help dev open check test clean
+.PHONY: help dev open check test demo package clean
 
 help: ## 사용할 수 있는 target 목록
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -25,6 +25,21 @@ check: ## JS 문법 검사와 manifest.json 검사
 
 test: ## 자동 테스트 (아직 없음)
 	@echo "자동 테스트가 아직 없습니다. 검증 절차는 UI-UX-WORKBENCH-REQUIREMENTS.md 9절을 따릅니다."
+
+# 확장은 manifest.json, extension/, src/core/, src/panel/만 읽는다. 개발 서버와 예제는 zip에 넣지 않는다.
+package: ## 확장 배포용 zip 만들기: dist/frame-mesh-extension-v<버전>.zip (Release 첨부용)
+	@version=$$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])"); \
+	out="dist/frame-mesh-extension-v$$version.zip"; \
+	mkdir -p dist && rm -f "$$out" && \
+	zip -qr "$$out" manifest.json extension src/core src/panel -x '*.DS_Store' && \
+	echo "ok  $$out"
+
+# ego-browser 출력을 파이프로 거르면 결과가 사라지는 경우가 있어 그대로 둔다.
+demo: ## 시연 GIF 다시 만들기 (make dev 서버, 확장 로드, ego-browser, ffmpeg 필요)
+	ego-browser nodejs -e "await import('file://$(CURDIR)/tools/demo/extension.mjs')" </dev/null
+	tools/demo/build.sh extension
+	ego-browser nodejs -e "await import('file://$(CURDIR)/tools/demo/workbench.mjs')" </dev/null
+	GIF_WIDTH=1400 tools/demo/build.sh workbench
 
 clean: ## 생성 파일 정리 (.DS_Store)
 	find . -name .DS_Store -delete

@@ -8,6 +8,10 @@ frame-mesh lets you edit a live web page like a design tool. Select an element, 
 2. Check the change log and the diff.
 3. Send the handoff to an agent, or chat with the agent from the page.
 
+![frame-mesh in the Chrome extension on a Wikipedia article: change the title size, resize an image, move a figure, show the diff, and copy a handoff](docs/demo-extension.gif)
+
+<sub>Demo page: the Wikipedia article [Web browser](https://en.wikipedia.org/wiki/Web_browser). The text and the video thumbnail ([Web browser demo.webm](https://commons.wikimedia.org/wiki/File:Web_browser_demo.webm), DecafPotato) are under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The screenshot `Safari 15.png` is in the public domain. frame-mesh has no relation to Wikipedia or the Wikimedia Foundation.</sub>
+
 frame-mesh has two hosts. Both use the same editor engine.
 
 - **Web workbench**: open a static HTML mockup and edit it at desktop, tablet, and mobile widths.
@@ -32,15 +36,35 @@ The project has no npm dependencies and no build step.
 make dev
 ```
 
+![frame-mesh web workbench: edit the sample mockup, check tablet and mobile widths, and review the diff](docs/demo-workbench.gif)
+
 Open `http://127.0.0.1:4173/index.html`. The sample mockup `fixtures/sample-plan.html` opens. If you see layers on the left, the preview in the center, and properties on the right, the workbench is ready. To open a different file, click "HTML 열기" (Open HTML) at the top.
 
 Use the `make dev` address. If you open the file through `file://`, the workbench cannot load the mockup. To change the port, run `make dev PORT=5000`.
 
 ## Start with the Chrome extension
 
+You can install the extension from a release zip or from this repository. Both use **Load unpacked** in Chrome.
+
+### Install from a release
+
+1. Download `frame-mesh-extension-v<version>.zip` from the Releases page of this repository.
+2. Unzip the file into a folder that you keep. If you delete the folder, the extension does not work.
+3. Open `chrome://extensions` and turn on **Developer mode**.
+4. Click **Load unpacked** and select the unzipped folder.
+
+The zip contains only the extension. Selection, edits, the change log, and "LLM용 복사" work without other files. "프로젝트에 저장" and the "대화" tab need the development server. For these features, get this repository and run `make dev`.
+
+To update, unzip the new release into the same folder. Then click the reload button on the frame-mesh card in `chrome://extensions`.
+
+### Install from the repository
+
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and select the **root folder** of this repository. The extension loads the shared engine in `src/core/`, so `manifest.json` is in the root.
-3. On the page to edit, click the frame-mesh icon in the toolbar. The side panel opens.
+
+### Open the side panel
+
+On the page to edit, click the frame-mesh icon in the toolbar. The side panel opens.
 
 When the side panel opens, a dock appears at the bottom of the page. Click an element on the page to select it. The side panel follows the active tab and shows layers and properties. The dock holds the tools, the change log, and the handoff buttons. When you close the side panel, the page works normally again.
 
@@ -177,6 +201,8 @@ For `/chat/*` and `/handoff`, the server accepts browser requests only from its 
 | `make open` | Opens the workbench in the default browser. It uses the macOS `open` command. |
 | `make check` | Checks the JS syntax and `manifest.json`. |
 | `make test` | Prints a notice. No automated tests exist yet. |
+| `make package` | Builds the release zip `dist/frame-mesh-extension-v<version>.zip`. The version comes from `manifest.json`. |
+| `make demo` | Records the demo GIFs in `docs/` again. It needs `make dev`, the loaded extension, `ego-browser`, and `ffmpeg`. |
 | `make clean` | Removes `.DS_Store` files. |
 | `make help` | Lists the targets. |
 
@@ -188,7 +214,9 @@ src/panel/     Layer and property panels, and the dock for the extension
 src/web/       Web workbench host (iframe preview, viewports)
 extension/     Extension background script, content script, and side panel
 tools/         Development server, chat relay, and MCP server
+tools/demo/    Demo recorder (`make demo`)
 fixtures/      Sample mockups (static page, late render, card with a link overlay)
+docs/          Demo GIFs
 ```
 
 The web workbench and the extension use the same engine. A feature in the engine works in both hosts.

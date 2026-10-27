@@ -8,6 +8,10 @@ frame-mesh는 실제 웹 페이지를 디자인 도구처럼 편집하는 도구
 2. 변경 로그와 diff로 결과를 확인합니다.
 3. 전달 묶음을 에이전트에게 넘기거나, 페이지에서 에이전트와 바로 대화합니다.
 
+![Chrome 확장으로 Wikipedia 문서의 제목 크기를 바꾸고, 사진 크기를 조절하고, 사진 카드를 옮긴 뒤 차이 표시와 전달 묶음 복사를 보여 주는 화면](docs/demo-extension.gif)
+
+<sub>시연 페이지: Wikipedia 문서 [Web browser](https://en.wikipedia.org/wiki/Web_browser). 본문과 영상 썸네일([Web browser demo.webm](https://commons.wikimedia.org/wiki/File:Web_browser_demo.webm), DecafPotato)은 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), 스크린샷 `Safari 15.png`는 퍼블릭 도메인입니다. frame-mesh는 Wikipedia·Wikimedia 재단과 관계가 없습니다.</sub>
+
 쓰는 방식은 두 가지이고, 같은 편집 엔진을 씁니다.
 
 - **웹 작업실**: 정적 HTML 시안을 열어 데스크톱·태블릿·모바일 폭으로 보며 편집합니다.
@@ -29,15 +33,35 @@ npm 의존성이나 빌드 단계는 없습니다.
 make dev
 ```
 
+![웹 작업실에서 예제 시안을 편집하고 태블릿·모바일 폭과 diff를 확인하는 화면](docs/demo-workbench.gif)
+
 브라우저에서 `http://127.0.0.1:4173/index.html`을 엽니다. 예제 시안(`fixtures/sample-plan.html`)이 바로 열리고, 왼쪽에 레이어, 가운데에 미리보기, 오른쪽에 속성 패널이 보이면 준비된 것입니다. 다른 HTML은 상단의 "HTML 열기"로 엽니다.
 
 `file://`로 열면 시안을 불러오지 못하므로 `make dev`로 띄운 주소를 씁니다. 포트는 `make dev PORT=5000`처럼 바꿀 수 있습니다.
 
 ## Chrome 확장으로 시작하기
 
+확장은 Release의 zip으로 설치하거나 이 저장소에서 바로 설치할 수 있습니다. 두 방법 모두 Chrome의 "압축해제된 확장 프로그램을 로드합니다"를 씁니다.
+
+### Release에서 설치하기
+
+1. 이 저장소의 Releases 페이지에서 `frame-mesh-extension-v<버전>.zip`을 내려받습니다.
+2. 계속 둘 폴더에 압축을 풉니다. 폴더를 지우면 확장이 동작하지 않습니다.
+3. `chrome://extensions`에서 "개발자 모드"를 켭니다.
+4. "압축해제된 확장 프로그램을 로드합니다"를 누르고 압축을 푼 폴더를 고릅니다.
+
+zip에는 확장만 들어 있습니다. 요소 선택, 편집, 변경 로그, "LLM용 복사"는 다른 파일 없이 동작합니다. "프로젝트에 저장"과 "대화" 탭은 개발 서버가 필요하므로, 이 기능을 쓰려면 저장소를 받아 `make dev`를 실행합니다.
+
+새 버전은 같은 폴더에 압축을 풀어 덮어쓴 뒤, `chrome://extensions`의 frame-mesh 카드에서 새로고침 버튼을 누릅니다.
+
+### 저장소에서 설치하기
+
 1. `chrome://extensions`에서 "개발자 모드"를 켭니다.
 2. "압축해제된 확장 프로그램을 로드합니다"를 누르고 이 저장소의 **루트 폴더**를 고릅니다. 확장이 공용 엔진(`src/core/`)을 함께 읽어야 해서 `manifest.json`을 루트에 두었습니다.
-3. 편집할 페이지에서 툴바의 frame-mesh 아이콘을 눌러 사이드 패널을 엽니다.
+
+### 사이드 패널 열기
+
+편집할 페이지에서 툴바의 frame-mesh 아이콘을 눌러 사이드 패널을 엽니다.
 
 패널이 열리면 페이지 아래에 도크가 나타나고, 페이지를 클릭하면 요소가 선택됩니다. 사이드 패널은 지금 보는 탭을 따라가며 레이어와 속성을 보여 주고, 도구 모음·변경 로그·전달 버튼은 도크에 있습니다. 패널을 닫으면 페이지는 원래대로 동작합니다.
 
@@ -174,6 +198,8 @@ curl -X POST http://127.0.0.1:4173/handoff \
 | `make open` | 기본 브라우저로 작업실 열기 (macOS `open` 사용) |
 | `make check` | JS 문법과 `manifest.json` 검사 |
 | `make test` | 안내만 출력합니다. 자동 테스트는 아직 없습니다 |
+| `make package` | Release용 zip `dist/frame-mesh-extension-v<버전>.zip` 생성 (버전은 `manifest.json`에서 읽음) |
+| `make demo` | `docs/`의 시연 GIF 다시 녹화 (`make dev` 서버, 확장 로드, `ego-browser`, `ffmpeg` 필요) |
 | `make clean` | `.DS_Store` 정리 |
 | `make help` | 명령 목록 |
 
@@ -185,7 +211,9 @@ src/panel/     레이어·속성 패널과 확장용 하단 도크
 src/web/       웹 작업실 호스트(iframe 미리보기, 뷰포트)
 extension/     확장의 백그라운드, 콘텐츠 스크립트, 사이드 패널
 tools/         개발 서버, 대화 중계, MCP 서버
+tools/demo/    시연 녹화 도구(`make demo`)
 fixtures/      예제 시안(정적, 늦게 그려지는 페이지, 가리개가 있는 카드)
+docs/          시연 GIF
 ```
 
 웹 작업실과 확장은 같은 엔진을 쓰므로, 엔진에 넣은 기능은 두 곳에 함께 적용됩니다.
