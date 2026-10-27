@@ -226,3 +226,6 @@ button { cursor: pointer; }
 .mode-switch--sub[aria-checked="true"] { background: var(--ink); border-color: var(--ink); }
 /* 화면 위쪽에 있는 메뉴(웹 작업실 상단)는 아래로 펼친다. */
 .menu--down .menu__pop { bottom: auto; top: calc(100% + 6px); }
+/* 마우스를 올리면 잠시 뒤 뜨는 말풍선 (src/panel/tooltip.js) */
+.fm-tip { position: fixed; z-index: 2147483647; max-width: 280px; padding: 6px 9px; border-radius: 6px; background: rgba(24, 24, 30, 0.94); color: #fff; font: 12px/1.45 var(--font); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); pointer-events: none; white-space: normal; }
+.fm-tip[hidden] { display: none; }

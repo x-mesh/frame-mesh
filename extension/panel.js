@@ -2,6 +2,7 @@
 // 사이드 패널은 지금 보는(활성) 탭을 따라간다. 일반 탭으로 열었을 때만 ?tab=<id>로 고정하거나 탭 선택기를 쓴다.
 import { createPanel } from '../src/panel/panel.js';
 import { t, setLang, getLang, applyI18n } from '../src/core/i18n.js';
+import { installTooltips } from '../src/panel/tooltip.js';
 
 // 언어는 브라우저 언어를 따른다. chrome.storage의 fm:lang('en' | 'ko')이 있으면 그 값을 쓴다(시연 녹화 등).
 const storedLang = (await chrome.storage.local.get('fm:lang'))['fm:lang'];
@@ -33,6 +34,8 @@ const bridge = {
 };
 
 // 사이드 패널은 레이어와 속성만 그린다. 도구 모음·변경 로그·전달은 페이지 안 도크(content.js)가 맡는다.
+installTooltips(document, { container: document.body, doc: document, win: window });
+
 const panel = createPanel({
   els: { tree: $('tree'), props: $('props'), notice: $('notice') },
   bridge,

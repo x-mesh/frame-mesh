@@ -2,6 +2,7 @@
 import { createEngine } from '../core/engine.js';
 import { createPanel } from '../panel/panel.js';
 import { createChat } from '../panel/chat.js';
+import { installTooltips } from '../panel/tooltip.js';
 import { t, setLang, getLang, applyI18n, LANGS, LANG_NAMES } from '../core/i18n.js';
 
 // 언어 우선순위: 주소의 ?lang=en|ko → ⋯ 메뉴에서 고른 값(localStorage) → 브라우저 언어.
@@ -52,6 +53,8 @@ const bridge = {
     return Promise.resolve(state.engine[method](...args));
   },
 };
+
+installTooltips(document, { container: document.body, doc: document, win: window });
 
 const panel = createPanel({
   els: {

@@ -1,6 +1,7 @@
 // 확장용 페이지 안 하단 도크: 도구 모음과 변경 로그, 전달 버튼을 전체 폭으로 둔다. 사이드 패널은 레이어·속성만 맡는다.
 import { createPanel } from './panel.js';
 import { createChat } from './chat.js';
+import { installTooltips } from './tooltip.js';
 import { t, getLang, LANGS, LANG_NAMES } from '../core/i18n.js';
 
 // 톱니바퀴 아이콘: Feather Icons "settings" (MIT). 글자 ⚙는 운영체제마다 이모지로 보이거나 크기가 달라 SVG를 쓴다.
@@ -226,6 +227,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const pill = el('div', { class: 'pill', title: t('pill.title') }, [pillText, pillOpen, pillUndo]);
   pill.hidden = true;
   root.append(dock, dialog, notice, pill);
+  const tooltips = installTooltips(root, { container: root, doc, win });
   doc.documentElement.appendChild(host);
 
   const panel = createPanel({
@@ -324,6 +326,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   function destroy() {
     doc.removeEventListener('click', closeMenusOutside, true);
     if (chat) chat.destroy();
+    tooltips.destroy();
     host.remove();
   }
 
