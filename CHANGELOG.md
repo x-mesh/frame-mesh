@@ -4,6 +4,8 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-27
+
 ### Fixed
 
 - The E and Cmd+Z shortcuts did nothing while the Korean input method was on. They now also match the physical key.
