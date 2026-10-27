@@ -1,0 +1,13 @@
+# git-kit 저장소 설정. `git-kit ship`으로 릴리스한다.
+# ship이 manifest.json 버전과 CHANGELOG.md를 고치고 태그를 푸시하면, .github/workflows/release.yml이
+# 확장 zip을 만들어 Release에 첨부한다. watch는 그 실행이 끝날 때까지 기다리고, verify는 zip이 내려받아지는지 확인한다.
+ship:
+  version_files:
+    - path: manifest.json
+      pattern: '"version": "{version}"'
+  watch:
+    - name: release-workflow
+      command: tools/release.sh watch
+  verify:
+    - name: release-zip
+      command: tools/release.sh verify
