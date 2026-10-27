@@ -9,8 +9,8 @@ const W = 1600, H = 880;
 
 await page.cdp('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
 // 작업실은 시안 이름별로 변경 로그를 localStorage에 저장해 다시 열면 복원한다. 깨끗한 화면에서 녹화하고, 끝나면 원래 값을 되돌린다.
-const LOG_KEY = 'fm:log:fixtures/sample-plan.html';
-await page.goto(`${SERVER}/index.html?demo=${Date.now()}`);
+const LOG_KEY = 'fm:log:fixtures/sample-plan.en.html';
+await page.goto(`${SERVER}/index.html?lang=en&demo=${Date.now()}`);
 const savedLog = await page.evaluate((k) => { const v = localStorage.getItem(k); localStorage.removeItem(k); return v; }, LOG_KEY);
 await page.reload();
 await page.waitForFunction(() => document.getElementById('preview')?.contentDocument?.querySelector('h1'), undefined, { timeout: 10_000 });
@@ -44,14 +44,13 @@ try {
     return { x: r.x, y: r.y, w: r.width, h: r.height };
   }, prop);
   const selected = () => page.evaluate(() => document.querySelector('#props .props__head')?.textContent.trim() || '');
-  const button = (text) => rect('button', text);
 
   await rec.caption('Open a static HTML mockup and edit it in the web workbench');
   await rec.hold(2200);
 
   // 1. 선택
   await rec.caption('Click to select an element. Double-click to go one level deeper.');
-  const title = await inPreview('h1', '결제 흐름');
+  const title = await inPreview('h1', 'checkout flow');
   const tp = { x: Math.round(title.x + title.w * 0.3), y: Math.round(center(title).y) };
   await rec.click('page', tp.x, tp.y, { after: 600 });
   for (let i = 0; i < 3 && !(await selected()).startsWith('h1'); i += 1) await rec.dblclick('page', tp.x, tp.y, { after: 600 });
@@ -71,8 +70,8 @@ try {
   // 3. 끌어서 순서 바꾸기
   log('step 3');
   await rec.caption('Drag an element to reorder it.');
-  const card = await inPreview('li', '디자인 시안 선택');
-  const first = await inPreview('li', '범위 확정 승인');
+  const card = await inPreview('li', 'Choose a design');
+  const first = await inPreview('li', 'Approve the scope');
   const from = { x: Math.round(card.x + card.w * 0.4), y: Math.round(card.y + 20) };
   await rec.click('page', from.x, from.y, { after: 400 });
   await rec.drag('page', from, { x: from.x, y: Math.round(first.y + 8) });
@@ -81,11 +80,11 @@ try {
   // 4. 뷰포트
   log('step 4');
   await rec.caption('Check the result at tablet and mobile widths.');
-  const tablet = await button('태블릿');
+  const tablet = await rect('#vpSeg [data-key="tablet"]');
   await rec.click('page', center(tablet).x, center(tablet).y, { after: 1400 });
-  const mobile = await button('모바일');
+  const mobile = await rect('#vpSeg [data-key="mobile"]');
   await rec.click('page', center(mobile).x, center(mobile).y, { after: 1600 });
-  const desktop = await button('데스크톱');
+  const desktop = await rect('#vpSeg [data-key="desktop"]');
   await rec.click('page', center(desktop).x, center(desktop).y, { after: 900 });
 
   // 5. 차이 표시

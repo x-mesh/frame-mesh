@@ -20,7 +20,7 @@ const extId = await extPage.evaluate(() => {
 });
 await extPage.close();
 log('ext id');
-if (!extId) throw new Error('frame-mesh 확장을 찾지 못했습니다. chrome://extensions에서 저장소 루트를 먼저 로드하세요.');
+if (!extId) throw new Error('The frame-mesh extension was not found. Load the repository root in chrome://extensions first.');
 
 const W = 1040, H = 760, PW = 360;
 const TARGET = 'https://en.wikipedia.org/wiki/Web_browser';
@@ -29,15 +29,17 @@ const logKey = `fm:log:${new URL(url).origin}${new URL(url).pathname}${new URL(u
 
 await panel.goto(`chrome-extension://${extId}/extension/panel.html`);
 await sleep(500);
-// 녹화 중에만 도크 높이를 낮춘다. 끝나면 원래 설정으로 되돌린다.
-const savedDock = await panel.evaluate(async () => (await chrome.storage.local.get('fm:dock'))['fm:dock'] ?? null);
-await panel.evaluate(async () => chrome.storage.local.set({ 'fm:dock': { height: 190, collapsed: false } }));
+// 녹화 중에만 도크 높이를 낮추고 화면 언어를 영어로 고정한다. 끝나면 원래 설정으로 되돌린다.
+const saved = await panel.evaluate(async () => chrome.storage.local.get(['fm:dock', 'fm:lang']));
+await panel.evaluate(async () => chrome.storage.local.set({ 'fm:dock': { height: 190, collapsed: false }, 'fm:lang': 'en' }));
 const restore = async () => {
-  await panel.evaluate(async ([saved, key]) => {
-    if (saved) await chrome.storage.local.set({ 'fm:dock': saved });
-    else await chrome.storage.local.remove('fm:dock');
+  await panel.evaluate(async ([prev, key]) => {
+    for (const k of ['fm:dock', 'fm:lang']) {
+      if (prev[k] !== undefined) await chrome.storage.local.set({ [k]: prev[k] });
+      else await chrome.storage.local.remove(k);
+    }
     await chrome.storage.local.remove(key);
-  }, [savedDock, logKey]);
+  }, [saved, logKey]);
   for (const p of [page, panel]) await p.cdp('Emulation.clearDeviceMetricsOverride').catch(() => {});
 };
 
@@ -46,8 +48,8 @@ await sleep(1200);
 // 패널을 일반 탭으로 열면 활성 탭을 따라가 다른 탭에 붙을 수 있어, ?tab=으로 시안 탭에 고정한다.
 const tabId = await panel.evaluate(async (u) => (await chrome.tabs.query({})).find((t) => t.url === u)?.id, url);
 const loggedIn = await page.evaluate(() => !document.querySelector('#pt-login, #pt-login-2, a[href*="Special:UserLogin"]'));
-if (loggedIn) { await restore(); throw new Error('Wikipedia에 로그인된 상태입니다. 계정 이름이 찍히지 않도록 로그아웃한 뒤 다시 실행하세요.'); }
-if (!tabId) { await restore(); throw new Error(`대상 탭을 찾지 못했습니다: ${url}`); }
+if (loggedIn) { await restore(); throw new Error('You are signed in to Wikipedia. Sign out so that the account name is not recorded, then run again.'); }
+if (!tabId) { await restore(); throw new Error(`Target tab not found: ${url}`); }
 await panel.goto(`chrome-extension://${extId}/extension/panel.html?tab=${tabId}`);
 log('panel connected');
 await sleep(1200);
@@ -113,7 +115,7 @@ const selected = () => panel.evaluate(() => document.querySelector('.props__head
   await rec.caption('Drag a handle to resize. Hold Shift to keep the aspect ratio.');
   const img = await elRect('figure img', '');
   await rec.click('page', Math.round(img.x + img.w / 2), Math.round(img.y + img.h / 2), { after: 500 });
-  if (!(await selected()).startsWith('img')) throw new Error(`사진 대신 다른 요소가 선택되었습니다: ${(await selected()).slice(0, 40)}`);
+  if (!(await selected()).startsWith('img')) throw new Error(`Another element was selected instead of the image: ${(await selected()).slice(0, 40)}`);
   const corner = { x: Math.round(img.x + img.w), y: Math.round(img.y + img.h) };
   await page.keyboard.down('Shift');
   await rec.drag('page', corner, { x: corner.x + 60, y: corner.y + 60 });
@@ -123,11 +125,11 @@ const selected = () => panel.evaluate(() => document.querySelector('.props__head
   await rec.caption('Select the parent, then move it with the structure buttons.');
   // 사진과 카드 사이에 링크(a)가 있어, 카드가 선택될 때까지 부모로 올라간다.
   for (let i = 0; i < 3 && !(await selected()).startsWith('figure'); i += 1) {
-    const parentBtn = await panelButton('↑ 부모');
+    const parentBtn = await panelButton('↑ Parent');
     await rec.click('panel', center(parentBtn).x, center(parentBtn).y, { after: 600 });
   }
-  if (!(await selected()).startsWith('figure')) throw new Error(`사진 카드가 선택되지 않았습니다: ${(await selected()).slice(0, 40)}`);
-  const down = await panelButton('▼ 뒤로');
+  if (!(await selected()).startsWith('figure')) throw new Error(`The figure was not selected: ${(await selected()).slice(0, 40)}`);
+  const down = await panelButton('▼ Back');
   await rec.click('panel', center(down).x, center(down).y, { after: 1500 });
 
   log('step 4');
@@ -141,7 +143,7 @@ const selected = () => panel.evaluate(() => document.querySelector('.props__head
   log('step 5');
   // 5. 차이 표시
   await rec.caption('Show where each change came from.');
-  const view = await dock('보기');
+  const view = await dock('#btnView');
   await rec.click('page', center(view).x, center(view).y, { after: 300 });
   const diffBtn = await dock('#btnDiffView');
   await rec.click('page', center(diffBtn).x, center(diffBtn).y, { after: 300 });
@@ -150,7 +152,7 @@ const selected = () => panel.evaluate(() => document.querySelector('.props__head
   log('step 6');
   // 6. 변경 요약과 전달
   await rec.caption('Review the diff, then copy a handoff for your agent.');
-  const summary = await dock('변경 요약');
+  const summary = await dock('#tabDiff');
   await rec.click('page', center(summary).x, center(summary).y, { after: 1800 });
   const copy = await dock('#btnCopyLog');
   await rec.click('page', center(copy).x, center(copy).y, { after: 1800 });
