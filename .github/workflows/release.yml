@@ -15,7 +15,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check the version
         run: |
@@ -38,7 +38,7 @@ jobs:
 
       - name: Keep the zip (manual run)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frame-mesh-extension-v${{ env.VERSION }}
           path: dist/frame-mesh-extension-v${{ env.VERSION }}.zip
