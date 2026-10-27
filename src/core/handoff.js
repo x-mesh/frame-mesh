@@ -1,4 +1,6 @@
 // 변경 이력과 대상 문서를 LLM에 전달할 형태로 정리한다.
+import { t } from './i18n.js';
+
 const UI_ATTR = 'data-fm-ui';
 const SNIPPET_LIMIT = 4000;
 // 전체 HTML이 이보다 크면 변경된 요소의 조각만 싣는다.
@@ -20,19 +22,20 @@ export function elementPath(el) {
 }
 
 export function describeOp(op) {
-  if (op.kind === 'batch') return `제안 "${op.summary}" (${op.ops.length}건): ${op.ops.map(describeOp).join('; ')}${op.reason ? ` — 이유: ${op.reason}` : ''}`;
-  if (op.kind === 'style') return `${op.prop}: ${op.before || '(기본)'} → ${op.after || '(기본)'}`;
+  const dflt = t('op.default');
+  if (op.kind === 'batch') return t('op.proposal', { summary: op.summary, n: op.ops.length, ops: op.ops.map(describeOp).join('; ') }) + (op.reason ? t('op.reason', { reason: op.reason }) : '');
+  if (op.kind === 'style') return `${op.prop}: ${op.before || dflt} → ${op.after || dflt}`;
   if (op.kind === 'text') {
-    const cut = (t) => (t.length > 40 ? `${t.slice(0, 40)}…` : t);
-    return `문구: "${cut(op.before)}" → "${cut(op.after)}"`;
+    const cut = (s) => (s.length > 40 ? `${s.slice(0, 40)}…` : s);
+    return t('op.text', { before: cut(op.before), after: cut(op.after) });
   }
   if (op.kind === 'styles') {
-    if (op.gesture === 'offset' || op.gesture === 'nudge') return `위치 오프셋 → left ${op.after.left}, top ${op.after.top}`;
-    if (op.gesture === 'resize') return `크기 → ${Object.entries(op.after).map(([p, v]) => `${p} ${v}`).join(', ')}`;
-    return Object.entries(op.after).map(([p, v]) => `${p}: ${v || '(기본)'}`).join(', ');
+    if (op.gesture === 'offset' || op.gesture === 'nudge') return t('op.offset', { left: op.after.left, top: op.after.top });
+    if (op.gesture === 'resize') return t('op.resize', { list: Object.entries(op.after).map(([p, v]) => `${p} ${v}`).join(', ') });
+    return Object.entries(op.after).map(([p, v]) => `${p}: ${v || dflt}`).join(', ');
   }
-  if (op.from.parent === op.to.parent) return `${op.toLabel} 안에서 ${op.from.index + 1}번째 → ${op.to.index + 1}번째`;
-  return `${op.fromLabel} → ${op.toLabel} ${op.to.index + 1}번째`;
+  if (op.from.parent === op.to.parent) return t('op.moveWithin', { parent: op.toLabel, from: op.from.index + 1, to: op.to.index + 1 });
+  return t('op.moveTo', { from: op.fromLabel, to: op.toLabel, index: op.to.index + 1 });
 }
 
 function stripMarks(root) {
@@ -55,7 +58,7 @@ export function cleanHtml(doc) {
 
 export function cleanOuterHtml(el) {
   const html = stripMarks(el.cloneNode(true)).outerHTML;
-  return html.length > SNIPPET_LIMIT ? `${html.slice(0, SNIPPET_LIMIT)}\n<!-- … ${html.length - SNIPPET_LIMIT}자 생략 -->` : html;
+  return html.length > SNIPPET_LIMIT ? `${html.slice(0, SNIPPET_LIMIT)}\n${t('handoff.omitted', { n: html.length - SNIPPET_LIMIT })}` : html;
 }
 
 export function diffText(diff) {
@@ -77,45 +80,45 @@ export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId
 
   const items = applied.map((op, i) => {
     const now = currentPath(op.target);
-    const moved = now && now !== op.path ? ` (현재 위치: ${now})` : '';
-    const lost = now ? '' : ' (요소를 더 찾을 수 없음)';
-    return `${i + 1}. \`${op.label}\` — ${describeOp(op)} [${viewportLabel(op)}]\n   - 원래 경로: \`${op.path}\`${moved}${lost}`;
+    const moved = now && now !== op.path ? t('handoff.nowAt', { path: now }) : '';
+    const lost = now ? '' : ` ${t('handoff.lost')}`;
+    return `${i + 1}. \`${op.label}\` — ${describeOp(op)} [${viewportLabel(op)}]\n   - ${t('handoff.origPath')}: \`${op.path}\`${moved}${lost}`;
   });
 
   const resultSection = [];
   if (mode === 'full') {
-    resultSection.push('## 결과 HTML', '', '```html', fullHtml.trimEnd(), '```');
+    resultSection.push(t('handoff.resultFull'), '', '```html', fullHtml.trimEnd(), '```');
   } else {
-    resultSection.push('## 변경된 요소의 현재 HTML', '', '페이지 전체가 커서 변경된 요소만 싣습니다. 경로는 위 변경 목록의 현재 위치입니다.', '');
+    resultSection.push(t('handoff.resultChanged'), '', t('handoff.resultChangedNote'), '');
     const seen = new Set();
     applied.forEach((op, i) => {
       if (seen.has(op.target)) return;
       seen.add(op.target);
       const el = byId(op.target);
-      resultSection.push(`### ${i + 1}. \`${op.label}\``, '', '```html', el ? cleanOuterHtml(el) : '(요소를 더 찾을 수 없음)', '```', '');
+      resultSection.push(`### ${i + 1}. \`${op.label}\``, '', '```html', el ? cleanOuterHtml(el) : t('handoff.lost'), '```', '');
     });
   }
 
   const markdown = [
-    '# frame-mesh 변경 전달',
+    t('handoff.title'),
     '',
-    `- 원본: \`${sourceName}\``,
-    `- 적용된 변경: ${applied.length}건${undone ? ` (취소된 변경 ${undone}건은 제외)` : ''}`,
-    '- 변경은 요소의 인라인 스타일과 DOM 순서로 적용된 상태입니다.',
+    t('handoff.source', { source: sourceName }),
+    t('handoff.applied', { n: applied.length }) + (undone ? t('handoff.undone', { n: undone }) : ''),
+    t('handoff.state'),
     '',
-    '## 변경 목록',
+    t('handoff.list'),
     '',
-    items.length ? items.join('\n') : '(없음)',
+    items.length ? items.join('\n') : t('handoff.none'),
     '',
-    ...(diff.length ? ['## 원본 대비 변경 (diff)', '', '여러 번 바꾼 속성은 처음 값과 최종 값만 보여 줍니다.', '', '```diff', diffText(diff), '```', ''] : []),
-    ...(lostOps.length ? ['## 적용되지 않은 변경 (새로고침 뒤 요소를 찾지 못함)', '', ...lostOps.map((op) => `- \`${op.label}\` — ${describeOp(op)} (경로: \`${op.path}\`)`), ''] : []),
-    '## 요청',
+    ...(diff.length ? [t('handoff.diff'), '', t('handoff.diffNote'), '', '```diff', diffText(diff), '```', ''] : []),
+    ...(lostOps.length ? [t('handoff.lostTitle'), '', ...lostOps.map((op) => `- \`${op.label}\` — ${describeOp(op)} (${t('handoff.path')}: \`${op.path}\`)`), ''] : []),
+    t('handoff.request'),
     '',
-    '- 위 변경을 원본 소스에 반영해 주세요. 인라인 스타일을 그대로 두지 말고 기존 CSS 규칙을 수정하거나 필요한 규칙을 추가하세요.',
-    '- 변경 목록에 없는 본문, 구조, 동작은 바꾸지 마세요.',
-    applied.some((op) => op.kind === 'text') ? '- `문구:` 변경은 스타일이 아니라 글 내용입니다. 원본 소스의 해당 텍스트(다국어 리소스가 있으면 그 파일)를 고쳐 주세요.' : null,
-    hasOffset ? '- `위치 오프셋`(position: relative + left/top)은 작업실에서 끌어 놓은 임시 값입니다. 의도한 위치를 유지하는 적절한 레이아웃 속성(정렬, 여백, 순서)으로 바꿔 주세요.' : null,
-    '- 반영 후 데스크톱(1280px)과 모바일(390px)에서 결과를 확인해 주세요.',
+    t('handoff.req.apply'),
+    t('handoff.req.scope'),
+    applied.some((op) => op.kind === 'text') ? t('handoff.req.text', { label: t('op.textLabel') }) : null,
+    hasOffset ? t('handoff.req.offset', { label: t('op.offsetLabel') }) : null,
+    t('handoff.req.verify'),
     '',
     ...resultSection,
     '',

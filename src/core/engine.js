@@ -1,7 +1,8 @@
 // 호스트(웹 작업실, 확장)와 무관한 편집 엔진. 대상 document/window 안에서 선택·이동·크기 조절·이력을 처리한다.
 import { History } from './history.js';
-import { ALL_PROPS } from './props.js';
+import { ALL_PROPS, TEXT_PROP } from './props.js';
 import { buildHandoff, describeOp, elementPath } from './handoff.js';
+import { t } from './i18n.js';
 
 const COALESCE_MS = 1000;
 const DRAG_THRESHOLD = 4;
@@ -154,7 +155,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   const uiRoots = [];
   const listeners = [];
   const readViewport = getViewport || (() => ({ key: 'window', width: win.innerWidth }));
-  const labelViewport = viewportLabel || ((op) => `폭 ${op.width}`);
+  const labelViewport = viewportLabel || ((op) => t('op.width', { width: op.width }));
   const scroller = autoScroll || defaultAutoScroll;
   const history = new History({ apply: applyOp, revert: revertOp, onChange: onHistoryChange });
   const sumPx = (cs, keys) => keys.reduce((sum, k) => sum + (parseFloat(cs[k]) || 0), 0);
@@ -330,7 +331,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     state.domTimer = 0;
     if (state.selectedId && !byId(state.selectedId)) {
       state.selectedId = null;
-      onNotice('선택한 요소가 페이지에서 사라져 선택을 해제했습니다.');
+      onNotice(t('engine.selectionGone'));
     }
     state.elementCount = doc.querySelectorAll('[data-fm-id]').length;
     computeTypeInventory();
@@ -429,7 +430,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     });
     if (!fixed) return;
     onChange({ type: 'history', kind: 'restore' });
-    onNotice(`늦게 그려진 요소에 변경 ${fixed}건을 다시 적용했습니다.`);
+    onNotice(t('engine.reapplied', { n: fixed }));
   }
 
   function clearHistory() {
@@ -617,7 +618,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
         m.style.cssText = `transform:translate(${r.left + win.scrollX}px,${r.top + win.scrollY}px);width:${r.width}px;height:${r.height}px`;
         const n = doc.createElement('span');
         n.className = 'mark__n';
-        n.textContent = '제안';
+        n.textContent = t('engine.proposalTag');
         m.appendChild(n);
         ui.marks.appendChild(m);
       });
@@ -712,8 +713,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       const orig = originals.get(d.id);
       const moved = orig && (Math.abs(orig.left - cur.left) > 2 || Math.abs(orig.top - cur.top) > 2);
       const resized = orig && (Math.abs(orig.width - cur.width) > 1 || Math.abs(orig.height - cur.height) > 1);
-      if (orig && (moved || resized)) box('dv__orig', orig, `${idx + 1} 원래 ${Math.round(orig.width)}×${Math.round(orig.height)}`);
-      box('dv__cur', cur, `${idx + 1} 지금 ${Math.round(cur.width)}×${Math.round(cur.height)}`);
+      if (orig && (moved || resized)) box('dv__orig', orig, t('engine.dvOrig', { n: idx + 1, w: Math.round(orig.width), h: Math.round(orig.height) }));
+      box('dv__cur', cur, t('engine.dvCur', { n: idx + 1, w: Math.round(cur.width), h: Math.round(cur.height) }));
       if (moved) {
         const x1 = orig.left + orig.width / 2;
         const y1 = orig.top + orig.height / 2;
@@ -771,25 +772,25 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     (ops || []).forEach((p, i) => {
       const el = resolveByPath(p.path, p.label);
       if (!el) {
-        errors.push(`${i + 1}번: 요소를 찾지 못했습니다 (${p.label || '?'} · ${p.path || '?'})`);
+        errors.push(t('engine.err.notFound', { n: i + 1, label: p.label || '?', path: p.path || '?' }));
         return;
       }
       if (p.kind === 'style') {
         if (!p.prop) {
-          errors.push(`${i + 1}번: prop이 없습니다`);
+          errors.push(t('engine.err.noProp', { n: i + 1 }));
           return;
         }
         children.push({ kind: 'style', ...opBase(el), prop: p.prop, before: el.style.getPropertyValue(p.prop), after: p.value || '' });
       } else if (p.kind === 'text') {
         if (!isTextLeaf(el) || !(p.value || '').trim()) {
-          errors.push(`${i + 1}번: 글자만 있는 요소에만, 빈 문구가 아닐 때 적용할 수 있습니다`);
+          errors.push(t('engine.err.text', { n: i + 1 }));
           return;
         }
         children.push({ kind: 'text', ...opBase(el), before: el.textContent, after: p.value });
       } else if (p.kind === 'move') {
         const parent = resolveByPath(p.parentPath, p.parentLabel);
         if (!parent || parent === el || el.contains(parent) || !canHoldChildren(parent) || el === doc.body) {
-          errors.push(`${i + 1}번: 옮길 부모를 찾지 못했거나 옮길 수 없습니다`);
+          errors.push(t('engine.err.move', { n: i + 1 }));
           return;
         }
         const fromParent = el.parentElement;
@@ -802,12 +803,12 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
           fromLabel: describe(fromParent), toLabel: describe(parent), fromPath: elementPath(fromParent), toPath: elementPath(parent),
         });
       } else {
-        errors.push(`${i + 1}번: 알 수 없는 kind (${p.kind})`);
+        errors.push(t('engine.err.kind', { n: i + 1, kind: p.kind }));
       }
     });
-    if (errors.length || !children.length) return { errors: errors.length ? errors : ['적용할 변경이 없습니다'] };
+    if (errors.length || !children.length) return { errors: errors.length ? errors : [t('engine.err.empty')] };
     const vp = readViewport();
-    return { op: { kind: 'batch', proposalId: id, summary: summary || '', reason: reason || '', label: `제안: ${summary || id}`, target: children[0].target, path: children[0].path, ops: children, viewport: vp.key, width: vp.width, at: Date.now() } };
+    return { op: { kind: 'batch', proposalId: id, summary: summary || '', reason: reason || '', label: t('op.proposalLabel', { summary: summary || id }), target: children[0].target, path: children[0].path, ops: children, viewport: vp.key, width: vp.width, at: Date.now() } };
   }
 
   function clearPreview() {
@@ -876,7 +877,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     };
   }
 
-  const showValue = (v) => (v === '' || v == null ? '(기본)' : v);
+  const showValue = (v) => (v === '' || v == null ? t('op.default') : v);
 
   // 요소별 순 변경: 같은 속성을 여러 번 바꿨으면 처음 값과 지금 값만, 이동은 처음 자리와 지금 자리만 남긴다.
   const flatten = (ops) => ops.flatMap((op) => (op.kind === 'batch' ? op.ops : [op]));
@@ -891,11 +892,11 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
         else entry.props.get(prop).after = after;
       };
       if (op.kind === 'style') record(op.prop, op.before, op.after);
-      else if (op.kind === 'text') record('문구', op.before, op.after);
+      else if (op.kind === 'text') record(TEXT_PROP, op.before, op.after);
       else if (op.kind === 'styles') Object.keys(op.after).forEach((p) => record(p, op.before[p], op.after[p]));
       else if (op.kind === 'move') {
-        if (!entry.move) entry.move = { from: `${op.fromLabel} ${op.from.index + 1}번째`, fromKey: `${op.from.parent}:${op.from.index}` };
-        entry.move.to = `${op.toLabel} ${op.to.index + 1}번째`;
+        if (!entry.move) entry.move = { from: t('op.at', { parent: op.fromLabel, index: op.from.index + 1 }), fromKey: `${op.from.parent}:${op.from.index}` };
+        entry.move.to = t('op.at', { parent: op.toLabel, index: op.to.index + 1 });
         entry.move.toKey = `${op.to.parent}:${op.to.index}`;
       }
     });
@@ -903,11 +904,13 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     byTarget.forEach((entry, id) => {
       const lines = [];
       if (entry.move && entry.move.fromKey !== entry.move.toKey) {
-        lines.push({ sign: '-', text: `위치: ${entry.move.from}` }, { sign: '+', text: `위치: ${entry.move.to}` });
+        const pos = t('op.positionLabel');
+        lines.push({ sign: '-', text: `${pos}: ${entry.move.from}` }, { sign: '+', text: `${pos}: ${entry.move.to}` });
       }
       entry.props.forEach(({ before, after }, prop) => {
         if ((before || '') === (after || '')) return;
-        lines.push({ sign: '-', text: `${prop}: ${showValue(before)}` }, { sign: '+', text: `${prop}: ${showValue(after)}` });
+        const name = prop === TEXT_PROP ? t('op.textLabel') : prop;
+        lines.push({ sign: '-', text: `${name}: ${showValue(before)}` }, { sign: '+', text: `${name}: ${showValue(after)}` });
       });
       if (!lines.length) return;
       const el = byId(id);
@@ -1241,7 +1244,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       listen(win.navigation, 'navigate', (e) => {
         if (state.mode !== 'select' || !e.cancelable || e.hashChange || e.downloadRequest) return;
         e.preventDefault();
-        onNotice('선택 모드에서는 페이지 이동을 막습니다. 링크를 따라가려면 동작 모드로 바꾸세요.');
+        onNotice(t('engine.navBlocked'));
       });
     }
     listen(win, 'scroll', () => { hidePicker(); updateOverlays(); scheduleXray(); }, { passive: true });
@@ -1287,7 +1290,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     const link = e.target && typeof e.target.closest === 'function' ? e.target.closest('a[href]') : null;
     if (link) {
       e.preventDefault();
-      onNotice('동작 미리보기 모드에서도 페이지 이동은 차단합니다.');
+      onNotice(t('engine.navBlockedPreview'));
     }
   }
 
@@ -1346,7 +1349,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     }
     const head = doc.createElement('div');
     head.className = 'picker__head';
-    head.textContent = '이 지점에 겹친 요소 (위 → 아래)';
+    head.textContent = t('engine.pickerHead');
     p.appendChild(head);
     entries.forEach(({ el, mask }) => {
       ensureAncestorsIds(el);
@@ -1355,7 +1358,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       row.className = `picker__row${mask ? ' is-mask' : ''}${el.dataset.fmId === state.selectedId ? ' is-current' : ''}`;
       const label = doc.createElement('span');
       label.className = 'picker__label';
-      label.textContent = `${describe(el)}${mask ? ' (가리개)' : ''}`;
+      label.textContent = `${describe(el)}${mask ? t('engine.mask') : ''}`;
       const size = doc.createElement('span');
       size.className = 'picker__size';
       size.textContent = `${Math.round(r.width)}×${Math.round(r.height)}`;
@@ -1451,7 +1454,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function placeElement(el, { parent, index }) {
     const parentEl = byId(parent);
-    if (!parentEl) throw new Error(`컨테이너를 찾지 못했습니다: ${parent}`);
+    if (!parentEl) throw new Error(t('engine.err.container', { parent }));
     el.remove();
     parentEl.insertBefore(el, parentEl.children[index] || null);
   }
@@ -1464,7 +1467,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     }
     const el = byId(op.target);
     if (!el) {
-      onNotice(`대상 요소를 찾지 못해 변경을 적용하지 않았습니다: ${op.label}`);
+      onNotice(t('engine.applyLost', { label: op.label }));
       return;
     }
     if (op.kind === 'style' || op.kind === 'styles') {
@@ -1488,7 +1491,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     }
     const el = byId(op.target);
     if (!el) {
-      onNotice(`대상 요소를 찾지 못해 되돌리지 않았습니다: ${op.label}`);
+      onNotice(t('engine.undoLost', { label: op.label }));
       return;
     }
     if (op.kind === 'style') writeStyle(el, op.prop, op.before);
@@ -1508,7 +1511,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function editText(id) {
     const el = byId(id);
     if (!el || !isTextLeaf(el)) {
-      onNotice('글자만 들어 있는 요소에서만 문구를 고칠 수 있습니다.');
+      onNotice(t('engine.textOnly'));
       return;
     }
     ensureLive();
@@ -1563,7 +1566,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     if (commit && after !== before && after.trim()) {
       history.push({ kind: 'text', ...opBase(el), before, after });
     } else if (commit && !after.trim()) {
-      onNotice('문구를 비울 수는 없습니다. 원래 문구로 되돌렸습니다.');
+      onNotice(t('engine.textEmpty'));
     }
     updateOverlays();
     onChange({ type: 'mode' });
@@ -1662,15 +1665,15 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     ensureLive();
     if (!el || !toParentEl || !toParentEl.dataset.fmId) return;
     if (el === doc.body) {
-      onNotice('body는 이동할 수 없습니다.');
+      onNotice(t('engine.moveBody'));
       return;
     }
     if (el === toParentEl || el.contains(toParentEl)) {
-      onNotice('요소를 자기 자신이나 자손 안으로 옮길 수 없습니다.');
+      onNotice(t('engine.moveSelf'));
       return;
     }
     if (!canHoldChildren(toParentEl)) {
-      onNotice(`안에 요소를 넣을 수 없는 요소입니다: ${describe(toParentEl)}`);
+      onNotice(t('engine.noChildren', { el: describe(toParentEl) }));
       return;
     }
     while (beforeEl === el) beforeEl = beforeEl.nextElementSibling;
@@ -1808,7 +1811,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     if (el) el.removeAttribute('data-fm-dragging');
     hideDragOverlays();
     if (d.target) moveElement(el, d.target.container, d.target.beforeEl);
-    else onNotice('놓을 위치를 찾지 못해 이동하지 않았습니다.');
+    else onNotice(t('engine.noDrop'));
   }
 
   function cancelDrag(d) {
@@ -2172,13 +2175,13 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     const frame = sumPx(cs, ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']);
     const empty = rect.height - frame - content.height;
     if (empty < 4) return null;
-    return `min-height ${Math.round(minH)}px 때문에 약 ${Math.round(empty)}px의 빈 공간이 생깁니다.`;
+    return t('engine.hint.minHeight', { min: Math.round(minH), empty: Math.round(empty) });
   }
 
   function flowLabel(el) {
     const cs = win.getComputedStyle(el);
     if (cs.display.includes('flex')) return `flex · ${cs.flexDirection} · ${cs.justifyContent}`;
-    if (cs.display.includes('grid')) return `grid · ${cs.gridTemplateColumns.split(' ').length}열`;
+    if (cs.display.includes('grid')) return t('engine.grid', { n: cs.gridTemplateColumns.split(' ').length });
     return cs.display;
   }
 
@@ -2219,11 +2222,11 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       };
       if (op.kind === 'style') record(op.prop, op.before, op.after);
       else if (op.kind === 'styles') Object.keys(op.after).forEach((p) => record(p, op.before[p], op.after[p]));
-      else if (op.kind === 'text') record('문구', op.before, op.after);
+      else if (op.kind === 'text') record(TEXT_PROP, op.before, op.after);
     });
     return [...props.values()]
       .filter((c) => c.beforeInline !== c.after)
-      .map((c) => ({ ...c, before: c.prop === '문구' ? c.beforeInline : (c.beforeInline || state.origins.get(`${id}|${c.prop}`) || '') }));
+      .map((c) => ({ ...c, before: c.prop === TEXT_PROP ? c.beforeInline : (c.beforeInline || state.origins.get(`${id}|${c.prop}`) || '') }));
   }
 
   function buildTree() {

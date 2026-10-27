@@ -26,12 +26,12 @@ check: ## JS 문법 검사와 manifest.json 검사
 test: ## 자동 테스트 (아직 없음)
 	@echo "자동 테스트가 아직 없습니다. 검증 절차는 UI-UX-WORKBENCH-REQUIREMENTS.md 9절을 따릅니다."
 
-# 확장은 manifest.json, extension/, src/core/, src/panel/만 읽는다. 개발 서버와 예제는 zip에 넣지 않는다.
+# 확장은 manifest.json, _locales/, extension/, src/core/, src/panel/만 읽는다. 개발 서버와 예제는 zip에 넣지 않는다.
 package: ## 확장 배포용 zip 만들기: dist/frame-mesh-extension-v<버전>.zip (Release 첨부용)
 	@version=$$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])"); \
 	out="dist/frame-mesh-extension-v$$version.zip"; \
 	mkdir -p dist && rm -f "$$out" && \
-	zip -qr "$$out" manifest.json extension src/core src/panel -x '*.DS_Store' && \
+	zip -qr "$$out" manifest.json _locales extension src/core src/panel -x '*.DS_Store' && \
 	echo "ok  $$out"
 
 # ego-browser 출력을 파이프로 거르면 결과가 사라지는 경우가 있어 그대로 둔다.

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="frame-mesh" content="host">
-<title>frame-mesh 작업실</title>
+<title>frame-mesh workbench</title>
 <link rel="stylesheet" href="src/panel/panel.css">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -13,73 +13,73 @@
   <header class="topbar">
     <div class="topbar__group">
       <span class="brand">frame-mesh</span>
-      <span class="doc-name" id="docName">문서 없음</span>
-      <button class="btn" id="btnOpen" type="button">HTML 열기</button>
+      <span class="doc-name" id="docName" data-i18n="wb.noDoc"></span>
+      <button class="btn" id="btnOpen" type="button" data-i18n="wb.open"></button>
       <input type="file" id="fileInput" accept=".html,.htm" hidden>
-      <button class="btn" id="btnReload" type="button">시안 다시 열기</button>
+      <button class="btn" id="btnReload" type="button" data-i18n="wb.reload"></button>
       <span class="badge badge--warn" id="overflowBadge" hidden></span>
     </div>
     <div class="topbar__group">
       <div class="seg" id="vpSeg"></div>
-      <label class="vp-custom">폭 <input type="number" id="vpWidth" min="240" max="3840" step="1"> px</label>
+      <label class="vp-custom"><span data-i18n="wb.width"></span> <input type="number" id="vpWidth" min="240" max="3840" step="1"> px</label>
       <span class="zoom" id="zoomLabel">100%</span>
     </div>
     <div class="topbar__group">
       <div class="seg" id="modeSeg">
-        <button class="seg__btn is-active" type="button" data-mode="select">선택</button>
-        <button class="seg__btn" type="button" data-mode="interact">동작 미리보기</button>
+        <button class="seg__btn is-active" type="button" data-mode="select" data-i18n="wb.select"></button>
+        <button class="seg__btn" type="button" data-mode="interact" data-i18n="wb.interact"></button>
       </div>
-      <div class="seg" id="moveSeg" title="드래그할 때의 기본 이동 방식을 정합니다. ⌥(Option)을 누른 채 끌면 반대 방식으로 움직입니다.">
-        <button class="seg__btn is-active" type="button" data-move="flow">흐름 이동</button>
-        <button class="seg__btn" type="button" data-move="free">자유 위치</button>
+      <div class="seg" id="moveSeg" data-i18n-title="move.titleWb">
+        <button class="seg__btn is-active" type="button" data-move="flow" data-i18n="move.flow"></button>
+        <button class="seg__btn" type="button" data-move="free" data-i18n="move.free"></button>
       </div>
-      <button class="btn" id="btnMeasure" type="button" title="눈금자·가이드·좌표·거리 표시">측정</button>
-      <button class="btn" id="btnXray" type="button" title="화면 안 모든 요소의 영역과 이름을 한꺼번에 표시">분해</button>
-      <button class="btn" id="btnFocus" type="button" title="선택한 요소 밖을 어둡게 표시">집중</button>
-      <button class="btn" id="btnDiffView" type="button" title="바뀐 요소의 원래 자리(빨강)와 지금 자리(초록), 속성 변화를 페이지 위에 표시" disabled>차이 표시</button>
-      <button class="btn" id="btnPeek" type="button" title="변경을 지우지 않고 잠시 걷어 내 원래 화면 보기 (Esc로 돌아가기)" disabled>원본 보기</button>
-      <button class="btn" id="btnUndo" type="button" title="실행 취소 (⌘Z)" disabled>실행 취소</button>
-      <button class="btn" id="btnRedo" type="button" title="다시 실행 (⇧⌘Z)" disabled>다시 실행</button>
-      <button class="btn btn--primary" id="btnHandoff" type="button" title="변경 목록과 결과 HTML 묶음 표시">LLM에 전달</button>
+      <button class="btn" id="btnMeasure" type="button" data-i18n="view.measure" data-i18n-title="view.measureTitle"></button>
+      <button class="btn" id="btnXray" type="button" data-i18n="view.xray" data-i18n-title="view.xrayTitle"></button>
+      <button class="btn" id="btnFocus" type="button" data-i18n="view.focus" data-i18n-title="view.focusTitle"></button>
+      <button class="btn" id="btnDiffView" type="button" data-i18n="view.diff" data-i18n-title="view.diffTitle" disabled></button>
+      <button class="btn" id="btnPeek" type="button" data-i18n="panel.peek" data-i18n-title="peek.title" disabled></button>
+      <button class="btn" id="btnUndo" type="button" data-i18n="wb.undo" data-i18n-title="wb.undoTitle" disabled></button>
+      <button class="btn" id="btnRedo" type="button" data-i18n="dock.redo" data-i18n-title="wb.redoTitle" disabled></button>
+      <button class="btn btn--primary" id="btnHandoff" type="button" data-i18n="handoff.dialogTitle" data-i18n-title="wb.handoffTitle"></button>
     </div>
   </header>
 
   <aside class="panel panel--left">
-    <div class="panel__head">레이어 <span class="zoom">드래그로 이동</span></div>
+    <div class="panel__head"><span data-i18n="ext.layers"></span> <span class="zoom" data-i18n="wb.dragHint"></span></div>
     <div class="tree" id="tree"></div>
   </aside>
 
   <main class="canvas" id="canvas">
     <div class="frame-box" id="frameBox">
       <div class="frame-wrap" id="frameWrap">
-        <iframe id="preview" sandbox="allow-same-origin" title="미리보기"></iframe>
+        <iframe id="preview" sandbox="allow-same-origin" data-i18n-title="wb.preview"></iframe>
       </div>
     </div>
   </main>
 
   <aside class="panel panel--right">
-    <div class="panel__head">속성</div>
+    <div class="panel__head" data-i18n="ext.props"></div>
     <div class="props" id="props"></div>
   </aside>
 
   <footer class="bottom">
-    <div class="bottom__head"><span class="dock__tabs"><button class="dock__tab is-active" id="tabLog" type="button">로그</button><button class="dock__tab" id="tabDiff" type="button">변경 요약</button><button class="dock__tab" id="tabChat" type="button">대화</button></span> <span id="changeCount"></span><span class="bottom__actions"><button class="btn" id="btnCopyLog" type="button" title="변경 로그·요청·결과 HTML을 마크다운으로 복사">LLM용 복사</button> <button class="btn" id="btnSendLog" type="button" title="개발 서버로 보내 handoffs/에 저장">프로젝트에 저장</button> <button class="btn" id="btnClearLog" type="button" title="변경을 모두 되돌리고 로그 삭제">지우기</button></span></div>
+    <div class="bottom__head"><span class="dock__tabs"><button class="dock__tab is-active" id="tabLog" type="button" data-i18n="tab.log"></button><button class="dock__tab" id="tabDiff" type="button" data-i18n="tab.diff"></button><button class="dock__tab" id="tabChat" type="button" data-i18n="tab.chat"></button></span> <span id="changeCount"></span><span class="bottom__actions"><button class="btn" id="btnCopyLog" type="button" data-i18n="dock.copy" data-i18n-title="wb.copyTitle"></button> <button class="btn" id="btnSendLog" type="button" data-i18n="dock.save" data-i18n-title="wb.saveTitle"></button> <button class="btn" id="btnClearLog" type="button" data-i18n="wb.clear" data-i18n-title="dock.clearTitle"></button></span></div>
     <ol class="changes" id="changes"></ol>
     <div class="diff" id="diff" hidden></div>
     <div class="chat-host" id="chat" hidden></div>
-    <div class="status"><span id="status">문서 없음</span><span id="statusRight"></span></div>
+    <div class="status"><span id="status" data-i18n="wb.noDoc"></span><span id="statusRight"></span></div>
   </footer>
 </div>
 
 <dialog class="handoff" id="handoffDialog">
-  <div class="handoff__head"><strong>LLM에 전달</strong><span id="handoffSummary"></span></div>
-  <p class="handoff__desc">적용된 변경 목록, 요청 문구, 작업실 표식을 제거한 결과 HTML을 한 묶음으로 만들었습니다. 복사해서 에이전트에게 붙여 넣거나 파일로 저장하세요.</p>
+  <div class="handoff__head"><strong data-i18n="handoff.dialogTitle"></strong><span id="handoffSummary"></span></div>
+  <p class="handoff__desc" data-i18n="handoff.descWb"></p>
   <textarea id="handoffText" readonly spellcheck="false"></textarea>
   <div class="handoff__actions">
-    <button class="btn btn--primary" id="btnHandoffCopy" type="button">클립보드 복사</button>
-    <button class="btn" id="btnHandoffMd" type="button">.md 저장</button>
-    <button class="btn" id="btnHandoffJson" type="button">.json 저장</button>
-    <button class="btn" id="btnHandoffClose" type="button">닫기</button>
+    <button class="btn btn--primary" id="btnHandoffCopy" type="button" data-i18n="handoff.copy"></button>
+    <button class="btn" id="btnHandoffMd" type="button" data-i18n="handoff.saveMd"></button>
+    <button class="btn" id="btnHandoffJson" type="button" data-i18n="handoff.saveJson"></button>
+    <button class="btn" id="btnHandoffClose" type="button" data-i18n="handoff.close"></button>
   </div>
 </dialog>
 <div class="notice" id="notice" hidden></div>

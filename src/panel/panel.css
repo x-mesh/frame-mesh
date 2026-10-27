@@ -124,7 +124,7 @@ button { cursor: pointer; }
 
 /* 변경 목록 */
 .changes { list-style: none; margin: 0; padding: 4px 0; overflow: auto; }
-.changes:empty::before { content: "아직 변경이 없습니다. 미리보기에서 요소를 선택해 조정하세요."; display: block; padding: 8px 12px; color: var(--ink-3); }
+.changes:empty::before { content: attr(data-empty); display: block; padding: 8px 12px; color: var(--ink-3); }
 .change { display: grid; grid-template-columns: 28px 62px minmax(80px, 200px) 1fr auto; gap: 8px; padding: 3px 12px; cursor: default; font-family: var(--mono); font-size: 11px; }
 .change__time { color: var(--ink-3); }
 .change__flag { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; font-size: 10px; background: var(--accent-soft); color: var(--accent); }

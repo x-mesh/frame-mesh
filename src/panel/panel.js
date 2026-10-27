@@ -1,5 +1,6 @@
 // 작업실 패널(레이어·속성·변경 목록). 엔진과는 bridge.call(method, ...args)로만 대화하고 상태 스냅샷으로 그린다.
-import { PROP_GROUPS } from '../core/props.js';
+import { PROP_GROUPS, TEXT_PROP, groupTitle, fieldLabel } from '../core/props.js';
+import { t } from '../core/i18n.js';
 
 const NOTICE_MS = 4000;
 const ARROW_DELTAS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -31,9 +32,11 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     groupOverride: new Map(),
   };
   const doc = els.props.ownerDocument;
+  // 빈 로그 안내는 CSS ::before가 그리므로 문구를 속성으로 넘긴다.
+  if (els.changes) els.changes.dataset.empty = t('panel.changesEmpty');
 
   function call(method, ...args) {
-    return bridge.call(method, ...args).catch((err) => notice(`명령 실패: ${err.message}`));
+    return bridge.call(method, ...args).catch((err) => notice(t('panel.cmdFailed', { msg: err.message })));
   }
 
   function notice(message) {
@@ -64,14 +67,14 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       row.dataset.id = r.id;
       row.dataset.canHold = r.canHold ? '1' : '';
       row.draggable = r.draggable;
-      row.innerHTML = `<span class="tree__caret" title="펼치기·접기"></span><span class="tree__tag">${esc(r.tag)}</span><span class="tree__meta">${esc(r.meta)}</span>`;
+      row.innerHTML = `<span class="tree__caret" title="${esc(t('panel.treeToggle'))}"></span><span class="tree__tag">${esc(r.tag)}</span><span class="tree__meta">${esc(r.meta)}</span>`;
       frag.appendChild(row);
       view.treeRows.set(r.id, row);
     });
     if (truncated) {
       const more = doc.createElement('div');
       more.className = 'tree__more';
-      more.textContent = `레이어가 많아 ${rows.length}개까지만 표시합니다. 나머지는 미리보기에서 직접 선택하세요.`;
+      more.textContent = t('panel.treeMore', { n: rows.length });
       frag.appendChild(more);
     }
     els.tree.appendChild(frag);
@@ -223,12 +226,12 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     wrap.className = 'field';
     const label = doc.createElement('span');
     label.className = 'field__label';
-    label.textContent = def.label;
+    label.textContent = fieldLabel(def);
     label.title = def.prop;
     let input;
     if (def.kind === 'font') {
       input = doc.createElement('select');
-      input.append(new Option('기본', ''));
+      input.append(new Option(t('panel.default'), ''));
       const fonts = [...((view.state && view.state.fonts) || []), 'system-ui', 'sans-serif', 'serif', 'monospace'];
       [...new Set(fonts)].forEach((f) => {
         const label = f.split(',')[0].replace(/["']/g, '').trim();
@@ -238,7 +241,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       });
     } else if (def.kind === 'select') {
       input = doc.createElement('select');
-      input.append(new Option('기본', ''));
+      input.append(new Option(t('panel.default'), ''));
       def.options.forEach((o) => input.append(new Option(o, o)));
     } else if (def.kind === 'color') {
       input = doc.createElement('input');
@@ -254,7 +257,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     reset.type = 'button';
     reset.className = 'field__reset';
     reset.textContent = '×';
-    reset.title = '기본값으로 되돌리기';
+    reset.title = t('panel.resetField');
     wrap.append(label, input, dot, reset);
     let valueLine = null;
     if (def.kind === 'color') {
@@ -272,7 +275,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
         chip.className = 'scale__chip';
         chip.textContent = String(size);
         chip.dataset.size = String(size);
-        chip.title = `글자 크기 ${size}px (이 페이지에서 쓰는 크기)`;
+        chip.title = t('panel.scaleChip', { size });
         chip.addEventListener('click', (e) => {
           e.preventDefault();
           if (view.selectionId) call('setStyle', view.selectionId, 'font-size', `${size}px`);
@@ -304,8 +307,8 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  const PROP_LABELS = new Map(PROP_GROUPS.flatMap((g) => g.fields.map((f) => [f.prop, `${g.title} · ${f.label}`])));
-  const showValue = (v) => (v === '' || v == null ? '없음' : formatComputed(String(v)));
+  const PROP_LABELS = new Map(PROP_GROUPS.flatMap((g) => g.fields.map((f) => [f.prop, `${groupTitle(g)} · ${fieldLabel(f)}`])));
+  const showValue = (v) => (v === '' || v == null ? t('panel.none') : formatComputed(String(v)));
   const quoted = (snippet) => {
     const m = /"(.*)"$/.exec(snippet || '');
     return m ? m[1] : '';
@@ -315,14 +318,14 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
   const TEXT_TAGS = /^(h[1-6]|p|a|span|label|button|strong|em|b|i|small|figcaption)$/;
 
   // 요소 종류에 따라 처음 펼칠 속성 묶음. 사용자가 직접 펼치거나 접은 묶음은 그 선택을 따른다.
-  function groupOpen(title, sel) {
-    if (view.groupOverride.has(title)) return view.groupOverride.get(title);
-    const group = PROP_GROUPS.find((g) => g.title === title);
+  function groupOpen(key, sel) {
+    if (view.groupOverride.has(key)) return view.groupOverride.get(key);
+    const group = PROP_GROUPS.find((g) => g.key === key);
     if (group.fields.some((f) => (sel.fields[f.prop] || {}).inline)) return true;
     // 빈 공간 경고는 최소 높이 때문이므로 크기 묶음을 함께 펼친다.
-    if (title === '크기' && sel.hint) return true;
+    if (key === 'size' && sel.hint) return true;
     const tag = sel.crumbs.length ? sel.crumbs[sel.crumbs.length - 1].tag : '';
-    return sel.editable || TEXT_TAGS.test(tag) ? ['글자', '색'].includes(title) : ['크기', '패딩', '마진', '배치'].includes(title);
+    return sel.editable || TEXT_TAGS.test(tag) ? ['text', 'color'].includes(key) : ['size', 'padding', 'margin', 'layout'].includes(key);
   }
 
   function rebuildSelection(sel) {
@@ -347,8 +350,8 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       crumbs.appendChild(b);
     });
     head.appendChild(crumbs);
-    const parentBtn = actionButton('↑ 부모', () => call('selectParent'), '부모 요소 선택 (⇧Enter)');
-    const clearBtn = actionButton('✕', () => call('select', null), '선택 해제 (Esc)');
+    const parentBtn = actionButton(t('panel.parent'), () => call('selectParent'), t('panel.parentTitle'));
+    const clearBtn = actionButton('✕', () => call('select', null), t('panel.clearTitle'));
     parentBtn.disabled = !sel.parent;
     head.querySelector('[data-role="headActions"]').append(parentBtn, clearBtn);
     const hint = doc.createElement('div');
@@ -360,30 +363,30 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     // 경로는 한 줄로 두고 끝(현재 요소)이 보이게 맨 오른쪽으로 민다.
     requestAnimationFrame(() => { crumbs.scrollLeft = crumbs.scrollWidth; });
 
-    const changes = section('바꾼 값');
+    const changes = section(t('panel.changed'));
     changes.classList.add('props__changes');
     changes.dataset.role = 'changes';
     changes.appendChild(Object.assign(doc.createElement('div'), { className: 'change-list' }));
     root.appendChild(changes);
 
-    const struct = section('구조');
+    const struct = section(t('panel.structure'));
     if (sel.parent) {
       const info = doc.createElement('div');
       info.className = 'props__parent';
-      info.textContent = `부모 ${sel.parent.label} (${sel.parent.flow})`;
+      info.textContent = t('panel.parentInfo', { label: sel.parent.label, flow: sel.parent.flow });
       struct.appendChild(info);
     }
     const row = doc.createElement('div');
     row.className = 'actions-row';
     row.append(
-      actionButton('▲ 앞으로', () => call('moveWithin', -1), '같은 컨테이너 안에서 한 칸 앞으로'),
-      actionButton('▼ 뒤로', () => call('moveWithin', 1), '같은 컨테이너 안에서 한 칸 뒤로'),
+      actionButton(t('panel.forward'), () => call('moveWithin', -1), t('panel.forwardTitle')),
+      actionButton(t('panel.back'), () => call('moveWithin', 1), t('panel.backTitle')),
     );
-    const pushRight = actionButton('오른쪽 밀기', () => call('togglePushRight'), 'margin-left: auto 켜기·끄기');
+    const pushRight = actionButton(t('panel.pushRight'), () => call('togglePushRight'), t('panel.pushRightTitle'));
     pushRight.dataset.role = 'pushRight';
     row.appendChild(pushRight);
     if (sel.editable) {
-      const edit = actionButton('문구 편집', () => call('editText', sel.id), '페이지에서 바로 글을 고칩니다. Enter로 확정, Esc로 취소 (선택한 글자를 더블클릭해도 됩니다)');
+      const edit = actionButton(t('panel.editText'), () => call('editText', sel.id), t('panel.editTextTitle'));
       edit.dataset.role = 'editText';
       row.appendChild(edit);
     }
@@ -393,11 +396,11 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     PROP_GROUPS.forEach((group) => {
       const sec = doc.createElement('div');
       sec.className = 'props__section props__group';
-      sec.dataset.group = group.title;
+      sec.dataset.group = group.key;
       const title = doc.createElement('button');
       title.type = 'button';
       title.className = 'props__section-title props__group-title';
-      title.innerHTML = `<span><span class="props__caret"></span>${esc(group.title)}</span><span class="props__group-count" data-role="count"></span>`;
+      title.innerHTML = `<span><span class="props__caret"></span>${esc(groupTitle(group))}</span><span class="props__group-count" data-role="count"></span>`;
       const grid = doc.createElement('div');
       grid.className = `fields${group.single ? ' fields--single' : ''}`;
       group.fields.forEach((def) => grid.appendChild(createField(def)));
@@ -407,16 +410,16 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       };
       title.addEventListener('click', () => {
         const open = sec.classList.contains('is-collapsed');
-        view.groupOverride.set(group.title, open);
+        view.groupOverride.set(group.key, open);
         setOpen(open);
       });
-      setOpen(groupOpen(group.title, sel));
+      setOpen(groupOpen(group.key, sel));
       sec.append(title, grid);
       root.appendChild(sec);
     });
     const note = doc.createElement('p');
     note.className = 'props__note';
-    note.textContent = '값은 요소의 인라인 스타일로 들어가며 모든 뷰포트에 똑같이 적용됩니다. 원본 CSS에 반영하려면 변경 로그를 LLM에 전달합니다.';
+    note.textContent = t('panel.note');
     root.appendChild(note);
   }
 
@@ -425,11 +428,11 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     const list = sec.querySelector('.change-list');
     list.textContent = '';
     sec.hidden = !sel.changes.length;
-    sec.querySelector('.props__section-title span').textContent = `바꾼 값 ${sel.changes.length}`;
+    sec.querySelector('.props__section-title span').textContent = t('panel.changedN', { n: sel.changes.length });
     sel.changes.forEach((c) => {
       const item = doc.createElement('div');
       item.className = 'change-item';
-      const label = Object.assign(doc.createElement('span'), { className: 'change-item__label', textContent: c.prop === '문구' ? '문구' : PROP_LABELS.get(c.prop) || c.prop });
+      const label = Object.assign(doc.createElement('span'), { className: 'change-item__label', textContent: c.prop === TEXT_PROP ? t('op.textLabel') : PROP_LABELS.get(c.prop) || c.prop });
       label.title = c.prop;
       const values = doc.createElement('span');
       values.className = 'change-item__values';
@@ -441,8 +444,8 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       values.title = `${showValue(c.before)} → ${showValue(c.after)}`;
       item.append(label, values);
       // 문구는 되돌릴 API가 없어 로그의 되돌리기를 쓴다.
-      if (c.prop !== '문구') {
-        const undo = Object.assign(doc.createElement('button'), { type: 'button', className: 'change-item__undo', textContent: '↺', title: '이 값만 원래대로' });
+      if (c.prop !== TEXT_PROP) {
+        const undo = Object.assign(doc.createElement('button'), { type: 'button', className: 'change-item__undo', textContent: '↺', title: t('panel.undoOne') });
         undo.addEventListener('click', () => call('setStyle', sel.id, c.prop, c.beforeInline));
         item.appendChild(undo);
       }
@@ -459,7 +462,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     root.querySelector('[data-role="dims"]').textContent = `${sel.dims} · x ${sel.x} · y ${sel.y}`;
     const badge = root.querySelector('[data-role="modCount"]');
     badge.hidden = !sel.changes.length;
-    badge.textContent = `바뀜 ${sel.changes.length}`;
+    badge.textContent = t('panel.modN', { n: sel.changes.length });
     const hint = root.querySelector('[data-role="hint"]');
     hint.hidden = !sel.hint;
     hint.textContent = sel.hint || '';
@@ -469,12 +472,12 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     const editBtn = root.querySelector('[data-role="editText"]');
     if (editBtn) {
       editBtn.classList.toggle('is-active', !!sel.editing);
-      editBtn.textContent = sel.editing ? '편집 중 · Enter 확정' : '문구 편집';
+      editBtn.textContent = sel.editing ? t('panel.editing') : t('panel.editText');
     }
     root.querySelectorAll('.props__group').forEach((sec) => {
-      const group = PROP_GROUPS.find((g) => g.title === sec.dataset.group);
+      const group = PROP_GROUPS.find((g) => g.key === sec.dataset.group);
       const n = group.fields.filter((f) => (sel.fields[f.prop] || {}).inline).length;
-      sec.querySelector('[data-role="count"]').textContent = n ? `바뀜 ${n}` : '';
+      sec.querySelector('[data-role="count"]').textContent = n ? t('panel.modN', { n }) : '';
       sec.classList.toggle('has-modified', n > 0);
     });
     for (const { def, input, wrap, valueLine } of view.fields.values()) {
@@ -485,7 +488,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       }
       const modified = inline !== '';
       wrap.classList.toggle('is-modified', modified);
-      if (valueLine) valueLine.textContent = modified ? `${inline} (계산값 ${computed})` : computed;
+      if (valueLine) valueLine.textContent = modified ? t('panel.computed', { inline, computed }) : computed;
       if (doc.activeElement === input) continue;
       if (def.kind === 'px') {
         const n = parseFloat(inline);
@@ -494,11 +497,11 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       } else if (def.kind === 'color') {
         input.value = toHex(inline) || toHex(computed) || '#000000';
       } else if (def.kind === 'font') {
-        input.options[0].textContent = `기본 (${computed.split(',')[0].replace(/["']/g, '').trim()})`;
+        input.options[0].textContent = t('panel.defaultOf', { v: computed.split(',')[0].replace(/["']/g, '').trim() });
         if (modified && !Array.from(input.options).some((o) => o.value === inline)) input.append(new Option(inline.split(',')[0].replace(/["']/g, ''), inline));
         input.value = modified ? inline : '';
       } else if (def.kind === 'select') {
-        input.options[0].textContent = `기본 (${computed})`;
+        input.options[0].textContent = t('panel.defaultOf', { v: computed });
         input.value = modified && Array.from(input.options).some((o) => o.value === inline) ? inline : '';
       } else {
         input.value = inline;
@@ -507,16 +510,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     }
   }
 
-  const EMPTY_KEYS = [
-    ['클릭', '눈에 보이는 상자 선택'],
-    ['더블클릭', '한 단계 안쪽'],
-    ['⌘클릭', '가장 깊은 요소'],
-    ['우클릭', '겹친 요소 목록'],
-    ['드래그 · 핸들', '옮기기 · 크기 바꾸기'],
-    ['방향키', '1px 이동 (Shift 10px)'],
-    ['E', '편집 켜기·끄기'],
-    ['Space 누르는 동안', '잠깐 페이지 사용'],
-  ];
+  const EMPTY_KEYS = ['click', 'dbl', 'cmd', 'right', 'drag', 'arrows', 'e', 'space'];
 
   function renderSelection(sel) {
     if (!sel) {
@@ -524,9 +518,9 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       view.fields.clear();
       els.props.textContent = '';
       const wrap = Object.assign(doc.createElement('div'), { className: 'props__empty' });
-      wrap.appendChild(Object.assign(doc.createElement('p'), { className: 'props__empty-title', textContent: '페이지나 레이어에서 요소를 고르세요' }));
+      wrap.appendChild(Object.assign(doc.createElement('p'), { className: 'props__empty-title', textContent: t('panel.emptyTitle') }));
       const list = Object.assign(doc.createElement('dl'), { className: 'keys' });
-      EMPTY_KEYS.forEach(([k, v]) => list.append(Object.assign(doc.createElement('dt'), { textContent: k }), Object.assign(doc.createElement('dd'), { textContent: v })));
+      EMPTY_KEYS.forEach((k) => list.append(Object.assign(doc.createElement('dt'), { textContent: t(`keys.${k}`) }), Object.assign(doc.createElement('dd'), { textContent: t(`keys.${k}Desc`) })));
       wrap.appendChild(list);
       els.props.appendChild(wrap);
       return;
@@ -545,10 +539,10 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     state.changes.forEach((c) => {
       const li = doc.createElement('li');
       li.className = `change${c.undone ? ' is-undone' : ''}`;
-      li.title = c.undone ? '여기까지 다시 실행' : '여기까지만 유지';
+      li.title = c.undone ? t('panel.redoTo') : t('panel.keepTo');
       const time = c.at ? new Date(c.at).toTimeString().slice(0, 8) : '';
       if (c.lost) li.classList.add('change--lost');
-      const flag = c.lost ? '복원 실패' : c.restored ? '복원' : '';
+      const flag = c.lost ? t('panel.restoreFailed') : c.restored ? t('panel.restored') : '';
       li.innerHTML = `<span class="change__n">${c.n}</span><span class="change__time">${time}</span><span class="change__target">${esc(c.label)}</span><span class="change__desc">${esc(c.desc)}${flag ? ` <span class="change__flag">${flag}</span>` : ''}</span><span class="change__vp">${esc(c.vp)}</span>`;
       li.addEventListener('click', () => call('goto', c.n));
       els.changes.appendChild(li);
@@ -562,7 +556,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     els.diff.textContent = '';
     const diff = state.diff || [];
     if (!diff.length) {
-      els.diff.appendChild(Object.assign(doc.createElement('p'), { className: 'diff__empty', textContent: '원본과 달라진 곳이 없습니다.' }));
+      els.diff.appendChild(Object.assign(doc.createElement('p'), { className: 'diff__empty', textContent: t('panel.diffEmpty') }));
       return;
     }
     diff.forEach((d) => {
@@ -571,7 +565,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       const head = doc.createElement('button');
       head.type = 'button';
       head.className = 'diff__head';
-      head.title = '이 요소 선택';
+      head.title = t('panel.selectThis');
       head.textContent = `${d.label}  ${d.currentPath || d.path}`;
       head.addEventListener('click', () => call('select', d.id));
       block.appendChild(head);
@@ -644,14 +638,14 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     if (els.btnPeek) {
       els.btnPeek.classList.toggle('is-active', !!state.peek);
       els.btnPeek.disabled = !state.peek && !state.applied;
-      els.btnPeek.textContent = state.peek ? '변경 다시 보기' : '원본 보기';
+      els.btnPeek.textContent = state.peek ? t('panel.peekBack') : t('panel.peek');
     }
     if (els.btnUndo) els.btnUndo.disabled = !state.canUndo;
     if (els.btnRedo) els.btnRedo.disabled = !state.canRedo;
     if (els.btnReset) els.btnReset.disabled = !state.canUndo;
     if (els.modeToggle) {
       els.modeToggle.setAttribute('aria-checked', String(state.mode === 'select'));
-      els.modeLabel.textContent = state.mode === 'select' ? '편집 중' : state.holding ? '잠깐 페이지 사용 중' : '페이지 사용 중';
+      els.modeLabel.textContent = state.mode === 'select' ? t('mode.editing') : state.holding ? t('mode.holding') : t('mode.using');
     }
     if (els.modeSeg) els.modeSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === state.mode));
     if (els.moveSeg) els.moveSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.move === state.moveMode));
@@ -665,24 +659,24 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     try {
       result = await bridge.call('getHandoff');
     } catch (err) {
-      notice(`전달 묶음을 만들지 못했습니다: ${err.message}`);
+      notice(t('panel.handoffFailed', { msg: err.message }));
       return;
     }
     view.handoff = result;
     h.text.value = result.markdown;
     const applied = view.state ? view.state.cursor : 0;
-    h.summary.textContent = `적용된 변경 ${applied}건 · ${Math.round(result.markdown.length / 1024)}KB · ${result.json.htmlMode === 'full' ? '전체 HTML 포함' : '변경 요소만 포함'}`;
+    h.summary.textContent = t('panel.handoffSummary', { n: applied, kb: Math.round(result.markdown.length / 1024), mode: result.json.htmlMode === 'full' ? t('panel.htmlFull') : t('panel.htmlChanged') });
     h.dialog.showModal();
   }
 
   async function copyHandoff() {
     try {
       await navigator.clipboard.writeText(view.handoff.markdown);
-      notice('클립보드에 복사했습니다. 에이전트에게 붙여 넣으세요.');
+      notice(t('panel.copied'));
     } catch (err) {
       els.handoff.text.focus();
       els.handoff.text.select();
-      notice(`클립보드 복사 실패: ${err.message}. 텍스트를 직접 복사하세요.`);
+      notice(t('panel.copyFailed', { msg: err.message }));
     }
   }
 
@@ -692,16 +686,16 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     try {
       result = await bridge.call('getHandoff');
     } catch (err) {
-      notice(`전달 묶음을 만들지 못했습니다: ${err.message}`);
+      notice(t('panel.handoffFailed', { msg: err.message }));
       return;
     }
     view.handoff = result;
     const applied = view.state ? view.state.cursor : 0;
     try {
       await navigator.clipboard.writeText(result.markdown);
-      notice(`변경 ${applied}건과 결과 HTML을 LLM용 마크다운으로 복사했습니다.`);
+      notice(t('panel.copiedLlm', { n: applied }));
     } catch (err) {
-      notice(`클립보드 복사 실패: ${err.message}. "전달…"에서 텍스트를 직접 복사하세요.`);
+      notice(t('panel.copyFailedLlm', { msg: err.message }));
     }
   }
 
@@ -712,7 +706,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     try {
       result = await bridge.call('getHandoff');
     } catch (err) {
-      notice(`전달 묶음을 만들지 못했습니다: ${err.message}`);
+      notice(t('panel.handoffFailed', { msg: err.message }));
       return;
     }
     view.handoff = result;
@@ -726,19 +720,19 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
         const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         body = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
       }
-      if (!body || !body.ok) throw new Error((body && body.error) || '저장 실패');
-      notice(`프로젝트에 저장했습니다: ${body.files.join(', ')}`);
+      if (!body || !body.ok) throw new Error((body && body.error) || t('panel.saveFailed'));
+      notice(t('panel.saved', { files: body.files.join(', ') }));
     } catch (err) {
-      notice(`수신기(${url})에 보내지 못했습니다: ${err.message}. make dev가 실행 중인지 확인하세요.`);
+      notice(t('panel.sendFailed', { url, msg: err.message }));
     }
   }
 
   async function clearLog() {
     const total = view.state ? view.state.total : 0;
     if (!total) return;
-    if (!window.confirm(`변경 ${total}건을 모두 되돌리고 로그를 지울까요?`)) return;
+    if (!window.confirm(t('panel.clearConfirm', { n: total }))) return;
     await call('clearLog');
-    notice('로그를 지우고 변경을 모두 되돌렸습니다.');
+    notice(t('panel.cleared'));
   }
 
   function downloadText(name, content, type) {

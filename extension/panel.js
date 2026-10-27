@@ -1,6 +1,13 @@
 // 확장 패널 호스트: 대상 탭의 콘텐츠 스크립트와 포트로 연결해 패널을 그린다.
 // 사이드 패널은 지금 보는(활성) 탭을 따라간다. 일반 탭으로 열었을 때만 ?tab=<id>로 고정하거나 탭 선택기를 쓴다.
 import { createPanel } from '../src/panel/panel.js';
+import { t, setLang, getLang, applyI18n } from '../src/core/i18n.js';
+
+// 언어는 브라우저 언어를 따른다. chrome.storage의 fm:lang('en' | 'ko')이 있으면 그 값을 쓴다(시연 녹화 등).
+const storedLang = (await chrome.storage.local.get('fm:lang'))['fm:lang'];
+if (storedLang) setLang(storedLang);
+document.documentElement.lang = getLang();
+applyI18n(document);
 
 const $ = (id) => document.getElementById(id);
 // 새로고침 직후에는 콘텐츠 스크립트가 아직 뜨기 전일 수 있어 연결을 몇 번 다시 시도한다.
@@ -12,7 +19,7 @@ const conn = { port: null, tabId: null, seq: 0, pending: new Map(), selfTabId: n
 const bridge = {
   call: (method, ...args) => new Promise((resolve, reject) => {
     if (!conn.port) {
-      reject(new Error('대상 탭에 연결되지 않았습니다'));
+      reject(new Error(t('ext.notTabConnected')));
       return;
     }
     const id = ++conn.seq;
@@ -38,11 +45,11 @@ function showTarget(tab) {
   const label = $('tabLabel');
   label.hidden = false;
   if (!tab) {
-    label.textContent = '편집할 페이지가 없습니다';
+    label.textContent = t('ext.noPage');
     label.classList.add('is-blocked');
     label.title = '';
   } else if (!canEdit(tab)) {
-    label.textContent = `편집할 수 없는 페이지 · ${tab.url || tab.title || ''}`;
+    label.textContent = t('ext.cannotEditUrl', { url: tab.url || tab.title || '' });
     label.classList.add('is-blocked');
     label.title = tab.url || '';
   } else {
@@ -77,7 +84,7 @@ function disconnect() {
     try { conn.port.disconnect(); } catch (_) { /* 이미 끊긴 포트 */ }
   }
   conn.port = null;
-  conn.pending.forEach((p) => p.reject(new Error('연결이 끊어졌습니다')));
+  conn.pending.forEach((p) => p.reject(new Error(t('ext.disconnectedErr'))));
   conn.pending.clear();
 }
 
@@ -112,8 +119,8 @@ function onMessage(msg) {
     const n = msg.state.applied || 0;
     const chip = $('appliedChip');
     chip.classList.toggle('is-clean', !n);
-    chip.textContent = n ? `변경 ${n}건 적용 중 · 원본 아님 · 로그는 페이지 아래 도크` : '변경 없음 · 원본 상태 · 로그는 페이지 아래 도크';
-    setStatus(`${msg.state.source} · 요소 ${msg.state.elementCount}개 · ${msg.state.mode === 'select' ? '선택 모드' : '동작 모드'}`);
+    chip.textContent = n ? t('ext.chipN', { n }) : t('ext.chipClean');
+    setStatus(t('ext.status', { source: msg.state.source, n: msg.state.elementCount, mode: msg.state.mode === 'select' ? t('ext.modeSelect') : t('ext.modeInteract') }));
   } else if (msg.type === 'notice') {
     panel.notice(msg.message);
   } else if (msg.type === 'result') {
@@ -130,7 +137,7 @@ function connect(tabId, attempt = 0) {
   conn.tabId = tabId;
   if (!tabId) {
     panel.clear();
-    setStatus('편집할 페이지가 없습니다. http(s) 페이지를 연 뒤 다시 시도하세요.');
+    setStatus(t('ext.noPageRetry'));
     return;
   }
   const port = chrome.tabs.connect(tabId, { name: 'fm-panel' });
@@ -146,22 +153,22 @@ function connect(tabId, attempt = 0) {
     if (conn.port !== port) return;
     conn.port = null;
     if (!gotState && attempt < RECONNECT_TRIES) {
-      setStatus(`연결 재시도 ${attempt + 1}/${RECONNECT_TRIES}…`);
+      setStatus(t('ext.retry', { n: attempt + 1, max: RECONNECT_TRIES }));
       setTimeout(() => {
         if (conn.tabId === tabId && !conn.port) connect(tabId, attempt + 1);
       }, RECONNECT_DELAY_MS);
       return;
     }
     panel.clear();
-    setStatus('연결 끊김');
+    setStatus(t('ext.disconnected'));
     showReconnect(true);
   });
-  setStatus(attempt ? `연결 재시도 ${attempt}/${RECONNECT_TRIES}…` : '연결 중…');
+  setStatus(attempt ? t('ext.retry', { n: attempt, max: RECONNECT_TRIES }) : t('ext.connecting'));
 }
 
 async function inject(tabId) {
   const res = await chrome.runtime.sendMessage({ type: 'inject', tabId });
-  if (!res || !res.ok) throw new Error(res ? res.error : '응답 없음');
+  if (!res || !res.ok) throw new Error(res ? res.error : t('ext.noResponse'));
   return res.result;
 }
 
@@ -172,13 +179,13 @@ async function attach(tabId) {
     result = await inject(tabId);
   } catch (err) {
     panel.clear();
-    setStatus(`이 페이지에서는 편집을 시작할 수 없습니다: ${err.message}`);
+    setStatus(t('ext.cannotStart', { msg: err.message }));
     showReconnect(true);
     return;
   }
   if (result === 'host') {
     panel.clear();
-    setStatus('frame-mesh 작업실 페이지는 자체 패널을 씁니다');
+    setStatus(t('ext.hostPage'));
     showReconnect(false);
     return;
   }
@@ -188,7 +195,7 @@ async function attach(tabId) {
 async function startEditing() {
   const tabId = conn.followActive ? conn.tabId : (Number($('tabSelect').value) || conn.tabId);
   if (!tabId) {
-    panel.notice('편집할 http(s) 탭이 없습니다. 페이지를 연 뒤 다시 누르세요.');
+    panel.notice(t('ext.noHttpTab'));
     return;
   }
   await attach(tabId);
@@ -206,7 +213,7 @@ function followTab(tab) {
     disconnect();
     conn.tabId = null;
     panel.clear();
-    setStatus(tab ? '이 페이지는 편집할 수 없습니다' : '편집할 페이지가 없습니다');
+    setStatus(tab ? t('ext.cannotEdit') : t('ext.noPage'));
     showReconnect(false);
     return;
   }
@@ -302,7 +309,7 @@ async function init() {
     try { tab = await chrome.tabs.get(conn.fixedTabId); } catch (_) { /* 닫힌 탭 */ }
     showTarget(tab);
     if (canEdit(tab)) attach(tab.id);
-    else setStatus('지정한 탭을 편집할 수 없습니다');
+    else setStatus(t('ext.fixedCannotEdit'));
     return;
   }
 
@@ -315,7 +322,7 @@ async function init() {
     $('tabSelect').value = String(tabs[0].id);
     attach(tabs[0].id);
   } else {
-    setStatus('편집할 페이지가 없습니다. http(s) 페이지를 연 뒤 다시 시도하세요.');
+    setStatus(t('ext.noPageRetry'));
   }
 }
 

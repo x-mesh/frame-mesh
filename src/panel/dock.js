@@ -1,6 +1,7 @@
 // 확장용 페이지 안 하단 도크: 도구 모음과 변경 로그, 전달 버튼을 전체 폭으로 둔다. 사이드 패널은 레이어·속성만 맡는다.
 import { createPanel } from './panel.js';
 import { createChat } from './chat.js';
+import { t } from '../core/i18n.js';
 
 const DOCK_MIN_H = 96;
 const DOCK_DEFAULT_H = 180;
@@ -123,8 +124,8 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const menuItem = (id, text, title, extra = '') => el('button', { class: `menu__item${extra}`, id, type: 'button', title, text });
   // 버튼을 누르면 위로 펼쳐지는 메뉴. 바깥을 누르거나 Esc를 누르면 닫힌다.
   const menus = [];
-  const menu = (label, title, side, children) => {
-    const trigger = el('button', { class: 'btn', type: 'button', title, text: label });
+  const menu = (id, label, title, side, children) => {
+    const trigger = el('button', { class: 'btn', id, type: 'button', title, text: label });
     const pop = el('div', { class: 'menu__pop' }, children);
     pop.hidden = true;
     trigger.addEventListener('click', (e) => {
@@ -141,49 +142,49 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   });
   doc.addEventListener('click', (e) => { if (!e.composedPath().includes(host)) menus.forEach((m) => { m.hidden = true; }); }, true);
 
-  const modeLabel = el('span', { text: '편집 중' });
-  const modeToggle = el('button', { class: 'mode-switch', id: 'modeToggle', type: 'button', role: 'switch', 'aria-checked': 'true', title: '켜면 요소를 고르고 편집합니다. 끄면 페이지를 원래대로 씁니다. E: 전환 · Space를 누르는 동안: 잠깐 페이지 사용' }, [el('span', { class: 'mode-switch__track' }), modeLabel, el('kbd', { text: 'E' })]);
-  const moveSeg = el('div', { class: 'seg', id: 'moveSeg', title: '⌥(Option)을 누른 채 끌면 반대 방식으로 움직입니다.' }, [segBtn('data-move', 'flow', '흐름 이동', true), segBtn('data-move', 'free', '자유 위치')]);
-  const btnMeasure = menuItem('btnMeasure', '측정', '눈금자·가이드·좌표·거리 표시');
-  const btnXray = menuItem('btnXray', '분해', '화면 안 모든 요소의 영역과 이름을 한꺼번에 표시');
-  const btnFocus = menuItem('btnFocus', '집중', '선택한 요소 밖을 어둡게 표시');
-  const btnDiffView = menuItem('btnDiffView', '차이 표시', '바뀐 요소의 원래 자리(빨강)와 지금 자리(초록)를 페이지 위에 표시');
-  const viewMenu = menu('보기 ▾', '표시 옵션과 드래그 방식', 'left', [
-    el('div', { class: 'menu__label', text: '페이지 위 표시' }), btnMeasure, btnXray, btnFocus, btnDiffView,
+  const modeLabel = el('span', { text: t('mode.editing') });
+  const modeToggle = el('button', { class: 'mode-switch', id: 'modeToggle', type: 'button', role: 'switch', 'aria-checked': 'true', title: t('dock.modeTitle') }, [el('span', { class: 'mode-switch__track' }), modeLabel, el('kbd', { text: 'E' })]);
+  const moveSeg = el('div', { class: 'seg', id: 'moveSeg', title: t('move.title') }, [segBtn('data-move', 'flow', t('move.flow'), true), segBtn('data-move', 'free', t('move.free'))]);
+  const btnMeasure = menuItem('btnMeasure', t('view.measure'), t('view.measureTitle'));
+  const btnXray = menuItem('btnXray', t('view.xray'), t('view.xrayTitle'));
+  const btnFocus = menuItem('btnFocus', t('view.focus'), t('view.focusTitle'));
+  const btnDiffView = menuItem('btnDiffView', t('view.diff'), t('view.diffTitle'));
+  const viewMenu = menu('btnView', t('dock.view'), t('dock.viewTitle'), 'left', [
+    el('div', { class: 'menu__label', text: t('dock.overlays') }), btnMeasure, btnXray, btnFocus, btnDiffView,
     el('div', { class: 'menu__div' }),
-    el('div', { class: 'menu__label', text: '드래그 방식' }), el('div', { class: 'menu__seg' }, [moveSeg]),
+    el('div', { class: 'menu__label', text: t('dock.dragMode') }), el('div', { class: 'menu__seg' }, [moveSeg]),
   ]);
-  const btnPeek = btn('btnPeek', '원본 보기', '변경을 지우지 않고 잠시 걷어 내 원래 화면 보기 (Esc로 돌아가기)');
+  const btnPeek = btn('btnPeek', t('panel.peek'), t('peek.title'));
   const historyBtn = (id, glyph, text, title) => el('button', { class: 'btn btn--history', id, type: 'button', title }, [el('span', { class: 'btn__glyph', text: glyph }), el('span', { text })]);
-  const btnUndo = historyBtn('btnUndo', '↶', '되돌리기', '방금 한 변경 되돌리기 (⌘Z)');
-  const btnRedo = historyBtn('btnRedo', '↷', '다시 실행', '되돌린 변경 다시 적용 (⇧⌘Z)');
-  const btnReset = historyBtn('btnReset', '⟲', '처음 상태로', '모든 변경을 한 번에 걷어 페이지를 처음 상태로 되돌립니다. 로그는 남으므로 "다시 실행"으로 하나씩 복구할 수 있습니다.');
+  const btnUndo = historyBtn('btnUndo', '↶', t('dock.undo'), t('dock.undoTitle'));
+  const btnRedo = historyBtn('btnRedo', '↷', t('dock.redo'), t('dock.redoTitle'));
+  const btnReset = historyBtn('btnReset', '⟲', t('dock.reset'), t('dock.resetTitle'));
   btnReset.classList.add('btn--reset');
   btnReset.disabled = true;
   btnUndo.disabled = true;
   btnRedo.disabled = true;
   const changeCount = el('span', { id: 'changeCount' });
-  const applied = el('span', { class: 'applied is-clean', text: '원본 상태' });
-  const tabLog = el('button', { class: 'dock__tab is-active', type: 'button', text: '로그' }, [changeCount]);
-  const tabDiff = el('button', { class: 'dock__tab', type: 'button', text: '변경 요약' });
-  const tabChat = el('button', { class: 'dock__tab', type: 'button', text: '대화' });
+  const applied = el('span', { class: 'applied is-clean', text: t('applied.clean') });
+  const tabLog = el('button', { class: 'dock__tab is-active', id: 'tabLog', type: 'button', text: t('tab.log') }, [changeCount]);
+  const tabDiff = el('button', { class: 'dock__tab', id: 'tabDiff', type: 'button', text: t('tab.diff') });
+  const tabChat = el('button', { class: 'dock__tab', id: 'tabChat', type: 'button', text: t('tab.chat') });
   const tabs = el('div', { class: 'dock__tabs' }, [tabLog, tabDiff, tabChat]);
-  const btnCopyLog = btn('btnCopyLog', 'LLM용 복사', '변경 로그·diff·결과 HTML을 마크다운으로 복사', ' btn--primary');
-  const btnSendLog = menuItem('btnSendLog', '프로젝트에 저장', '개발 서버(make dev)로 보내 handoffs/에 저장');
-  const btnHandoff = menuItem('btnHandoff', '내용 보기·파일 저장', '전달 묶음을 보고 .md/.json으로 저장');
-  const btnClearLog = menuItem('btnClearLog', '모두 되돌리고 로그 지우기', '변경을 모두 되돌리고 로그 삭제', ' menu__item--danger');
+  const btnCopyLog = btn('btnCopyLog', t('dock.copy'), t('dock.copyTitle'), ' btn--primary');
+  const btnSendLog = menuItem('btnSendLog', t('dock.save'), t('dock.saveTitle'));
+  const btnHandoff = menuItem('btnHandoff', t('dock.viewFile'), t('dock.viewFileTitle'));
+  const btnClearLog = menuItem('btnClearLog', t('dock.clear'), t('dock.clearTitle'), ' menu__item--danger');
   [btnSendLog, btnHandoff, btnClearLog].forEach((b) => b.addEventListener('click', () => menus.forEach((m) => { m.hidden = true; })));
-  const moreMenu = menu('⋯', '저장과 지우기', 'right', [btnSendLog, btnHandoff, el('div', { class: 'menu__div' }), btnClearLog]);
-  const btnCollapse = btn('btnCollapse', '▾', '로그 접기/펼치기', ' icon');
+  const moreMenu = menu('btnMore', '⋯', t('dock.moreTitle'), 'right', [btnSendLog, btnHandoff, el('div', { class: 'menu__div' }), btnClearLog]);
+  const btnCollapse = btn('btnCollapse', '▾', t('dock.collapseTitle'), ' icon');
   const bar = el('div', { class: 'dock__bar' }, [
     el('div', { class: 'dock__group' }, [modeToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset]),
     el('div', { class: 'dock__group' }, [applied, tabs, btnCopyLog, moreMenu, btnCollapse]),
   ]);
-  const grip = el('div', { class: 'dock__grip', title: '끌어서 높이 조절' });
+  const grip = el('div', { class: 'dock__grip', title: t('dock.grip') });
   const changes = el('ol', { class: 'changes', id: 'changes' });
   const diffView = el('div', { class: 'diff' });
   diffView.hidden = true;
-  const peekbar = el('div', { class: 'peekbar', text: '원본 보기 중 · 변경은 그대로 있습니다 · 편집하거나 Esc를 누르면 돌아갑니다' });
+  const peekbar = el('div', { class: 'peekbar', text: t('dock.peekbar') });
   peekbar.hidden = true;
   const chatView = el('div', { class: 'chat-host' });
   chatView.hidden = true;
@@ -211,23 +212,23 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const handoffText = el('textarea', { id: 'handoffText', readonly: '', spellcheck: 'false' });
   const handoffSummary = el('span', { id: 'handoffSummary' });
   const receiverInput = el('input', { id: 'receiverUrl', type: 'url', spellcheck: 'false', placeholder: 'http://127.0.0.1:4173/handoff' });
-  const btnHandoffCopy = btn('btnHandoffCopy', '클립보드 복사', '', ' btn--primary');
-  const btnHandoffMd = btn('btnHandoffMd', '.md 저장', '');
-  const btnHandoffJson = btn('btnHandoffJson', '.json 저장', '');
-  const btnHandoffClose = btn('btnHandoffClose', '닫기', '');
+  const btnHandoffCopy = btn('btnHandoffCopy', t('handoff.copy'), '', ' btn--primary');
+  const btnHandoffMd = btn('btnHandoffMd', t('handoff.saveMd'), '');
+  const btnHandoffJson = btn('btnHandoffJson', t('handoff.saveJson'), '');
+  const btnHandoffClose = btn('btnHandoffClose', t('handoff.close'), '');
   const dialog = el('dialog', { class: 'handoff', id: 'handoffDialog' }, [
-    el('div', { class: 'handoff__head' }, [el('strong', { text: 'LLM에 전달' }), handoffSummary]),
-    el('p', { class: 'handoff__desc', text: '적용된 변경 목록, 요청 문구, 결과 HTML을 한 묶음으로 만들었습니다. 복사해서 에이전트에게 붙여 넣거나 파일로 저장하세요.' }),
+    el('div', { class: 'handoff__head' }, [el('strong', { text: t('handoff.dialogTitle') }), handoffSummary]),
+    el('p', { class: 'handoff__desc', text: t('handoff.desc') }),
     handoffText,
-    el('label', { class: 'handoff__receiver', text: '수신기 주소 ' }, [receiverInput]),
+    el('label', { class: 'handoff__receiver', text: t('handoff.receiver') }, [receiverInput]),
     el('div', { class: 'handoff__actions' }, [btnHandoffCopy, btnHandoffMd, btnHandoffJson, btnHandoffClose]),
   ]);
   const notice = el('div', { class: 'notice', id: 'notice' });
   notice.hidden = true;
   const pillText = el('span');
-  const pillOpen = btn('pillOpen', 'frame-mesh 열기', '사이드 패널을 열어 변경을 확인합니다', ' btn--open');
-  const pillUndo = btn('pillUndo', '모두 되돌리기', '적용 중인 변경을 모두 되돌리고 로그 삭제');
-  const pill = el('div', { class: 'pill', title: '눌러서 frame-mesh 열기' }, [pillText, pillOpen, pillUndo]);
+  const pillOpen = btn('pillOpen', t('pill.open'), t('pill.openTitle'), ' btn--open');
+  const pillUndo = btn('pillUndo', t('pill.undo'), t('pill.undoTitle'));
+  const pill = el('div', { class: 'pill', title: t('pill.title') }, [pillText, pillOpen, pillUndo]);
   pill.hidden = true;
   root.append(dock, dialog, notice, pill);
   doc.documentElement.appendChild(host);
@@ -291,7 +292,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   });
   pillUndo.addEventListener('click', async (e) => {
     e.stopPropagation();
-    if (!window.confirm(`적용 중인 변경 ${lastState ? lastState.applied : 0}건을 모두 되돌리고 로그를 지울까요?`)) return;
+    if (!window.confirm(t('pill.confirm', { n: lastState ? lastState.applied : 0 }))) return;
     await bridge.call('clearLog');
   });
 
@@ -299,12 +300,12 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     const n = lastState ? lastState.applied : 0;
     const peeking = !!(lastState && lastState.peek);
     applied.classList.toggle('is-clean', !n || peeking);
-    applied.textContent = peeking ? `원본 보기 중 · ${n}건 보관` : n ? `${n}건 적용 중` : '원본 상태';
-    applied.title = peeking ? '변경은 그대로 있습니다. Esc를 누르면 돌아갑니다.' : n ? '이 페이지는 원래 상태가 아닙니다.' : '적용 중인 변경이 없습니다.';
+    applied.textContent = peeking ? t('applied.peek', { n }) : n ? t('applied.n', { n }) : t('applied.clean');
+    applied.title = peeking ? t('applied.peekTitle') : n ? t('applied.nTitle') : t('applied.cleanTitle');
     peekbar.hidden = !peeking;
     pill.hidden = panelOpen || !n;
     pillText.textContent = '';
-    pillText.append('frame-mesh ', Object.assign(doc.createElement('b'), { textContent: `변경 ${n}건 적용 중` }), ' · 원본 아님');
+    pillText.append('frame-mesh ', Object.assign(doc.createElement('b'), { textContent: t('pill.applied', { n }) }), t('pill.notOriginal'));
   }
 
   function update(state) {
@@ -312,8 +313,8 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     dock.classList.toggle('is-editing', state.mode === 'select');
     renderApplied();
     panel.update({ ...state, tree: undefined });
-    status.textContent = `${state.source} · 요소 ${state.elementCount}개 · 조작 안내 ⓘ`;
-    status.title = 'E: 편집 켜기·끄기 · Space를 누르는 동안: 잠깐 페이지 사용 · 클릭: 상자 선택 · 더블클릭: 한 단계 안으로 · ⌘클릭: 가장 깊은 요소 · 우클릭: 겹친 요소 목록 · ⌥드래그: 반대 이동 방식 · 방향키: 1px 이동 · Esc: 선택 해제';
+    status.textContent = t('dock.status', { source: state.source, n: state.elementCount });
+    status.title = t('dock.statusTitle');
   }
 
   // 패널이 닫히면 도크는 숨기되, 적용 중인 변경이 있으면 알약을 남긴다.

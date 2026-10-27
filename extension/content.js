@@ -19,7 +19,9 @@
   document.documentElement.setAttribute('data-fm-owner', instanceId);
   document.dispatchEvent(new CustomEvent('fm:shutdown'));
   document.querySelectorAll('fm-overlay, fm-dock').forEach((n) => n.remove());
-  const boot = { ports: new Set(), engine: null, dock: null, restored: false, saveTimer: 0 };
+  const boot = { ports: new Set(), engine: null, dock: null, restored: false, saveTimer: 0, t: null };
+  // 사전 모듈은 엔진보다 먼저 불러온다. 그 전에 나가는 오류 문구만 영어 기본값을 쓴다.
+  const tr = (key, vars, fallback) => (boot.t ? boot.t(key, vars) : fallback);
   document.addEventListener('fm:shutdown', () => {
     if (document.documentElement.getAttribute('data-fm-owner') === instanceId) return;
     try { if (boot.engine) boot.engine.destroy(); } catch (_) { /* 이미 끊긴 엔진 */ }
@@ -65,7 +67,7 @@
     const stored = (await chrome.storage.local.get(LOG_KEY))[LOG_KEY];
     if (!stored || !stored.ops || !stored.ops.length) return;
     const r = boot.engine.restoreOps(stored);
-    notify(`이전 변경 ${r.restored}건을 복원했습니다${r.lost ? ` (${r.lost}건은 아직 요소를 찾지 못함)` : ''}.`);
+    notify(`${tr('ext.restored', { n: r.restored })}${r.lost ? tr('ext.restoredLost', { n: r.lost }) : ''}.`);
   }
 
   // 엔진 메서드 앞에서 가로채는 호스트 명령
@@ -99,7 +101,7 @@
     request: (method, path, body) => new Promise((resolve, reject) => {
       const port = [...boot.ports][0];
       if (!port) {
-        reject(new Error('사이드 패널이 연결되어 있지 않습니다'));
+        reject(new Error(tr('ext.panelNotConnected', null, 'The side panel is not connected')));
         return;
       }
       const id = ++chatSeq;
@@ -169,7 +171,7 @@
       }
       if (!msg || msg.type !== 'call') return;
       if (!boot.engine) {
-        port.postMessage({ type: 'result', id: msg.id, error: '아직 페이지를 준비하는 중입니다. 잠시 뒤 다시 시도하세요.' });
+        port.postMessage({ type: 'result', id: msg.id, error: tr('ext.notReady', null, 'The page is not ready yet. Try again in a moment.') });
         return;
       }
       try {
@@ -182,7 +184,13 @@
     if (boot.engine) port.postMessage({ type: 'state', state: boot.engine.getState({ tree: true }) });
   });
 
-  import(chrome.runtime.getURL('src/core/engine.js')).then(({ createEngine }) => {
+  // 언어는 브라우저 언어를 따르고, chrome.storage의 fm:lang('en' | 'ko')이 있으면 그 값을 쓴다.
+  import(chrome.runtime.getURL('src/core/i18n.js')).then(async (i18n) => {
+    const lang = (await chrome.storage.local.get('fm:lang'))['fm:lang'];
+    if (lang) i18n.setLang(lang);
+    boot.t = i18n.t;
+    return import(chrome.runtime.getURL('src/core/engine.js'));
+  }).then(({ createEngine }) => {
     const engine = createEngine({
       doc: document,
       win: window,
@@ -197,7 +205,7 @@
     boot.engine = engine;
     engine.init();
     if (boot.ports.size) restoreOnce();
-    mountDock(engine).catch((err) => console.error('frame-mesh: 도크 로드 실패', err));
-  }).catch((err) => console.error('frame-mesh: 엔진 로드 실패', err));
+    mountDock(engine).catch((err) => console.error('frame-mesh: dock failed to load', err));
+  }).catch((err) => console.error('frame-mesh: engine failed to load', err));
   return 'injected';
 })();

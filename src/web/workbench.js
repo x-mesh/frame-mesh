@@ -2,13 +2,23 @@
 import { createEngine } from '../core/engine.js';
 import { createPanel } from '../panel/panel.js';
 import { createChat } from '../panel/chat.js';
+import { t, setLang, getLang, applyI18n } from '../core/i18n.js';
 
-const DEFAULT_SOURCE = 'fixtures/sample-plan.html';
+// 언어는 브라우저 언어를 따르고, 주소의 ?lang=en|ko가 있으면 그 값을 쓴다. 패널을 만들기 전에 정해야 라벨이 그 언어로 그려진다.
+const forcedLang = new URLSearchParams(location.search).get('lang');
+if (forcedLang) setLang(forcedLang);
+document.documentElement.lang = getLang();
+document.title = t('wb.title');
+applyI18n(document);
+
+// 예제 시안도 화면 언어에 맞춘다.
+const DEFAULT_SOURCE = getLang() === 'ko' ? 'fixtures/sample-plan.html' : 'fixtures/sample-plan.en.html';
 const VIEWPORTS = [
-  { key: 'desktop', label: '데스크톱', width: 1280 },
-  { key: 'tablet', label: '태블릿', width: 834 },
-  { key: 'mobile', label: '모바일', width: 390 },
+  { key: 'desktop', width: 1280 },
+  { key: 'tablet', width: 834 },
+  { key: 'mobile', width: 390 },
 ];
+const vpLabel = (vp) => t(`vp.${vp.key}`);
 const VIEWPORT_MIN = 240;
 const VIEWPORT_MAX = 3840;
 const MIN_FRAME_HEIGHT = 480;
@@ -31,7 +41,7 @@ const timeLabel = (d) => d ? d.toTimeString().slice(0, 8) : '-';
 
 const bridge = {
   call: (method, ...args) => {
-    if (!state.engine) return Promise.reject(new Error('열린 문서가 없습니다'));
+    if (!state.engine) return Promise.reject(new Error(t('wb.noDocErr')));
     if (method === 'clearLog') {
       state.engine.clearHistory();
       localStorage.removeItem(logKey());
@@ -77,12 +87,12 @@ function restoreLog() {
     return;
   }
   const r = state.engine.restoreOps(stored);
-  panel.notice(`이전 변경 ${r.restored}건을 복원했습니다${r.lost ? ` (${r.lost}건은 요소를 찾지 못함)` : ''}.`);
+  panel.notice(`${t('ext.restored', { n: r.restored })}${r.lost ? t('ext.restoredLost', { n: r.lost }) : ''}.`);
 }
 
 function viewportLabel(op) {
   const preset = VIEWPORTS.find((v) => v.key === op.viewport);
-  return preset ? `${preset.label} ${op.width}` : `폭 ${op.width}`;
+  return preset ? `${vpLabel(preset)} ${op.width}` : t('op.width', { width: op.width });
 }
 
 // ---------- 문서 로드 ----------
@@ -91,18 +101,18 @@ async function loadDefault() {
   try {
     res = await fetch(DEFAULT_SOURCE);
   } catch (err) {
-    panel.notice(`시안 요청 실패: ${err.message}. HTTP 서버(make dev)로 연 주소에서 다시 여세요.`);
+    panel.notice(t('wb.fetchFailed', { msg: err.message }));
     return;
   }
   if (!res.ok) {
-    panel.notice(`시안을 불러오지 못했습니다: ${DEFAULT_SOURCE} (HTTP ${res.status})`);
+    panel.notice(t('wb.loadFailed', { src: DEFAULT_SOURCE, status: res.status }));
     return;
   }
   loadHtml(await res.text(), DEFAULT_SOURCE);
 }
 
 function loadHtml(html, name) {
-  if (state.snapshot && state.snapshot.total && !window.confirm('현재 변경 이력이 사라집니다. 새 문서를 열까요?')) return;
+  if (state.snapshot && state.snapshot.total && !window.confirm(t('wb.confirmOpen'))) return;
   state.sourceName = name;
   state.engine = null;
   state.snapshot = null;
@@ -113,7 +123,7 @@ function loadHtml(html, name) {
 function onFrameLoaded() {
   const doc = ui.iframe.contentDocument;
   if (!doc || !doc.body) {
-    panel.notice('미리보기 문서에 접근할 수 없습니다.');
+    panel.notice(t('wb.noAccess'));
     return;
   }
   const win = ui.iframe.contentWindow;
@@ -199,7 +209,7 @@ function renderViewportButtons() {
     b.type = 'button';
     b.className = 'seg__btn';
     b.dataset.key = vp.key;
-    b.textContent = `${vp.label} ${vp.width}`;
+    b.textContent = `${vpLabel(vp)} ${vp.width}`;
     b.addEventListener('click', () => setViewport(vp.key, vp.width));
     ui.vpSeg.appendChild(b);
   });
@@ -216,17 +226,17 @@ function setViewport(key, width) {
 function renderStatus() {
   const s = state.snapshot;
   if (!s) {
-    ui.status.textContent = '문서 없음';
+    ui.status.textContent = t('wb.noDoc');
     ui.statusRight.textContent = '';
     ui.overflowBadge.hidden = true;
     return;
   }
-  ui.status.textContent = [`정적 HTML · ${state.sourceName}`, `요소 ${s.elementCount}개`, `뷰포트 ${state.viewportWidth}px`, `마지막 렌더 ${timeLabel(state.renderedAt)}`].join(' · ');
-  const moveHint = s.moveMode === 'flow' ? '드래그: 흐름 이동 · ⌥드래그: 자유 위치' : '드래그: 자유 위치 · ⌥드래그: 흐름 이동';
-  ui.statusRight.textContent = `${s.mode === 'select' ? `선택 모드 · 클릭: 상자 선택 · 더블클릭: 안으로 · ⌘클릭: 깊게 · 우클릭: 겹친 요소 · ${moveHint} · 방향키: 1px` : '동작 미리보기 모드'} · 미리보기 스크립트·폼 전송 차단`;
+  ui.status.textContent = [t('wb.status.static', { name: state.sourceName }), t('wb.status.elements', { n: s.elementCount }), t('wb.status.viewport', { w: state.viewportWidth }), t('wb.status.render', { time: timeLabel(state.renderedAt) })].join(' · ');
+  const moveHint = s.moveMode === 'flow' ? t('wb.hint.flow') : t('wb.hint.free');
+  ui.statusRight.textContent = t('wb.hint.blocked', { mode: s.mode === 'select' ? t('wb.hint.select', { move: moveHint }) : t('wb.hint.interact') });
   const overflow = Math.round(state.overflowX);
   ui.overflowBadge.hidden = overflow < 1;
-  ui.overflowBadge.textContent = `가로 넘침 ${overflow}px`;
+  ui.overflowBadge.textContent = t('wb.overflow', { n: overflow });
 }
 
 // ---------- 초기화 ----------

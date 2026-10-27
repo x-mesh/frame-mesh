@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample mockup · Plan details</title>
+<style>
+  :root {
+    --purple-700: #4c1d95;
+    --purple-600: #5b21b6;
+    --purple-500: #7c3aed;
+    --purple-200: #ddd6fe;
+    --purple-100: #ede9fe;
+    --purple-50: #f5f3ff;
+    --ink: #1f1a2e;
+    --ink-muted: #6b6480;
+    --line: #e4e0f2;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--purple-50);
+    line-height: 1.6;
+  }
+  .doc-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 32px 40px 24px;
+    background: var(--white);
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--purple-600);
+    background: var(--purple-100);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .doc-header h1 { margin: 12px 0 8px; font-size: 28px; line-height: 1.3; }
+  .doc-header .meta { margin: 0; color: var(--ink-muted); font-size: 14px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 32px;
+    padding: 32px 40px 48px;
+  }
+  .checklist h2, .body h2 { margin: 0 0 16px; font-size: 18px; }
+  .check-list { list-style: none; margin: 0; padding: 0; }
+  .check-item {
+    min-height: 130px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .check-item__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .check-item__title { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
+  .check-item__desc { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-muted); }
+  .chip {
+    flex: none;
+    padding: 1px 8px;
+    font-size: 11px;
+    line-height: 1.6;
+    border-radius: 6px;
+    background: var(--purple-100);
+    color: var(--purple-700);
+  }
+  .chip--done { background: #e6f4ea; color: #1e7a3a; }
+  .body { display: flex; flex-direction: column; gap: 32px; }
+  .section {
+    background: var(--white);
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+  .section p { margin: 0 0 20px; }
+  .section p:last-child { margin-bottom: 0; }
+  .section ol, .section ul { margin: 0; padding-left: 22px; }
+  .section li { margin-bottom: 12px; }
+  .team-activity { background: var(--white); padding: 24px 32px; border: 1px solid var(--line); border-radius: 16px; }
+  .activity { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .activity:last-child { border-bottom: 0; }
+  .activity time { color: var(--ink-muted); min-width: 56px; }
+  .actions { display: flex; justify-content: center; padding-top: 24px; }
+  .btn-primary {
+    background: var(--purple-600);
+    color: var(--white);
+    border: 0;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary:hover { background: var(--purple-700); }
+  @media (max-width: 720px) {
+    .doc-header { flex-direction: column; padding: 20px 16px; }
+    .doc-header h1 { font-size: 22px; }
+    .layout { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px 32px; }
+    .section { padding: 20px; }
+    .team-activity { padding: 16px 20px; }
+  }
+</style>
+</head>
+<body>
+  <header class="doc-header">
+    <div class="doc-header__title">
+      <span class="eyebrow">Plan</span>
+      <h1>Q4 2026 checkout flow redesign</h1>
+      <p class="meta">Owner: Planning team · Due Nov 14 · Edited 2 hours ago</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="checklist">
+      <h2>My checklist</h2>
+      <ul class="check-list">
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">Approve the scope</p>
+            <span class="chip">Waiting</span>
+          </div>
+          <p class="check-item__desc">Decide whether the refund policy change is in this scope.</p>
+        </li>
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">Review the payment module design</p>
+            <span class="chip">Waiting</span>
+          </div>
+          <p class="check-item__desc">Check the retry policy for the payment gateway and the idempotency key design.</p>
+        </li>
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">Choose a design</p>
+            <span class="chip chip--done">Done</span>
+          </div>
+          <p class="check-item__desc">The purple and white palette is final.</p>
+        </li>
+        <li class="check-item">
+          <div class="check-item__head">
+            <p class="check-item__title">Agree on the launch check schedule</p>
+            <span class="chip">Waiting</span>
+          </div>
+          <p class="check-item__desc">Make sure that the QA and operations schedules do not overlap.</p>
+        </li>
+      </ul>
+    </aside>
+
+    <section class="body">
+      <article class="section section--tasks">
+        <h2>Work items</h2>
+        <ol>
+          <li>Split payment requests from approval responses and rebuild them as a state machine that can retry.</li>
+          <li>Use one layout for the result screens of card, wallet, and bank transfer payments.</li>
+          <li>Record each failure reason as a user message and as an operations log entry.</li>
+          <li>Add a compatibility layer so that existing orders can read the new status values without a migration.</li>
+        </ol>
+      </article>
+
+      <article class="section section--criteria">
+        <h2>Done when</h2>
+        <ul>
+          <li>The measured payment success rate is the same as or higher than before.</li>
+          <li>No duplicate payment occurs in the 12 reproduction scenarios.</li>
+          <li>The result screen shows the same information on mobile and desktop.</li>
+        </ul>
+      </article>
+
+      <section class="team-activity">
+        <h2>Team activity</h2>
+        <div class="activity"><time>10:42</time><span>A developer uploaded the payment state machine diagram.</span></div>
+        <div class="activity"><time>09:15</time><span>A designer edited done condition 2.</span></div>
+        <div class="activity"><time>Yesterday</time><span>The operations team shared a draft launch check schedule.</span></div>
+      </section>
+
+      <div class="actions">
+        <button type="button" class="btn-primary">Review plan details</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

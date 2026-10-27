@@ -1,0 +1,8 @@
+{
+  "extDescription": {
+    "message": "Select, move, and restyle elements on the open page, then hand the change log to an LLM"
+  },
+  "actionTitle": {
+    "message": "frame-mesh: edit this tab"
+  }
+}

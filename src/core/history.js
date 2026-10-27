@@ -39,7 +39,7 @@ export class History {
   }
 
   amendLast(patch) {
-    if (!this.atEnd || !this.last) throw new Error('amendLast: 이력 끝에서만 수정할 수 있습니다.');
+    if (!this.atEnd || !this.last) throw new Error('amendLast: only the last entry at the end of history can be amended.');
     Object.assign(this.last, patch);
     this.apply(this.last);
     this.onChange(this.last);

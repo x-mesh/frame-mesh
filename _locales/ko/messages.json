@@ -1,0 +1,8 @@
+{
+  "extDescription": {
+    "message": "열린 페이지의 요소를 선택·이동·조정하고, 변경 로그를 LLM에 전달하는 UI 작업실"
+  },
+  "actionTitle": {
+    "message": "frame-mesh: 이 탭에서 편집"
+  }
+}

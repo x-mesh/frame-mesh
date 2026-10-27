@@ -60,11 +60,11 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._guarded(path):
             return False
         if not self._origin_allowed():
-            self._json(403, {"ok": False, "error": "허용되지 않은 출처입니다"})
+            self._json(403, {"ok": False, "error": "Origin not allowed"})
             return True
         # JSON이 아닌 POST는 사전 확인 없이 다른 사이트에서 보낼 수 있으므로 받지 않는다.
         if require_json and "application/json" not in (self.headers.get("Content-Type") or ""):
-            self._json(415, {"ok": False, "error": "Content-Type: application/json 만 받습니다"})
+            self._json(415, {"ok": False, "error": "Only Content-Type: application/json is accepted"})
             return True
         return False
 
@@ -166,12 +166,12 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="frame-mesh 개발 서버")
+    parser = argparse.ArgumentParser(description="frame-mesh development server")
     parser.add_argument("--port", type=int, default=4173)
     parser.add_argument("--bind", default="127.0.0.1")
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.bind, args.port), Handler)
-    print(f"frame-mesh 작업실: http://{args.bind}:{args.port}/index.html  (전달 수신: POST /handoff → handoffs/)", flush=True)
+    print(f"frame-mesh workbench: http://{args.bind}:{args.port}/index.html  (handoffs: POST /handoff → handoffs/)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

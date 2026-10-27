@@ -1,20 +1,13 @@
 // frame-mesh 대화 화면. 실행 중인 AI 에이전트 세션과 개발 서버를 거쳐 대화하고, 변경 제안을 미리보고 수락한다.
 // transport: { request(method, path, body?) } — 웹 작업실은 fetch, 확장은 사이드 패널이 대신 요청한다.
 // bridge: 엔진 호출(getChatContext, previewProposal, acceptProposal, rejectProposal, getHandoff).
+import { t } from '../core/i18n.js';
 
 const STATUS_REFRESH_MS = 10000;
 const RETRY_MS = 3000;
-const MODE_TEXT = {
-  relay: '자동 전달 · 실행 중인 에이전트 세션으로 바로 보냅니다',
-  wait: '에이전트 대기 중 · 대기 중인 세션이 받아 갑니다',
-  manual: '수동 전달 · 에이전트가 받을 준비가 되지 않았습니다',
-};
-const DELIVERY_TEXT = {
-  submitted: '전달됨 · 응답 대기',
-  queued: '대기열에 넣음',
-  taken: '에이전트가 받음 · 응답 대기',
-  error: '전달 실패',
-};
+// 서버가 알려 주는 전달 방식과 상태. 모르는 값은 서버가 보낸 이름을 그대로 보여 준다.
+const MODES = ['relay', 'wait', 'manual'];
+const DELIVERY_STATES = ['submitted', 'queued', 'taken', 'error'];
 
 export function createChat({ root, transport, bridge, notice = () => {} }) {
   const doc = root.ownerDocument;
@@ -30,23 +23,23 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
   root.textContent = '';
   root.classList.add('chat');
   const head = el('div', 'chat__head');
-  const modeBadge = el('span', 'chat__mode', '연결 확인 중…');
+  const modeBadge = el('span', 'chat__mode', t('chat.checking'));
   const sessionSelect = el('select', 'chat__session');
   sessionSelect.hidden = true;
-  sessionSelect.title = '보낼 에이전트 세션';
+  sessionSelect.title = t('chat.sessionTitle');
   head.append(modeBadge, sessionSelect);
   const list = el('div', 'chat__list');
-  const empty = el('p', 'chat__empty', '선택한 요소와 변경 내용이 함께 전달됩니다. 예: "이 카드 여백을 줄여 줘", "버튼을 헤더 오른쪽으로 옮기는 안을 제안해 줘"');
+  const empty = el('p', 'chat__empty', t('chat.empty'));
   list.appendChild(empty);
   const form = el('div', 'chat__form');
   const input = el('textarea', 'chat__input');
   input.rows = 2;
-  input.placeholder = '에이전트에게 요청 (Enter 보내기 · Shift+Enter 줄바꿈)';
-  const btnSend = el('button', 'btn btn--primary', '보내기');
+  input.placeholder = t('chat.placeholder');
+  const btnSend = el('button', 'btn btn--primary', t('chat.send'));
   btnSend.type = 'button';
-  const btnApply = el('button', 'btn', '원본에 반영');
+  const btnApply = el('button', 'btn', t('chat.apply'));
   btnApply.type = 'button';
-  btnApply.title = '적용 중인 변경을 handoffs/latest.md에 저장하고, 원본 소스에 반영해 달라고 요청합니다';
+  btnApply.title = t('chat.applyTitle');
   form.append(input, el('div', 'chat__actions'));
   form.lastChild.append(btnSend, btnApply);
   root.append(head, list, form);
@@ -68,7 +61,7 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
     try {
       const st = await transport.request('GET', '/chat/status');
       view.status = st;
-      modeBadge.textContent = MODE_TEXT[st.mode] || st.mode;
+      modeBadge.textContent = MODES.includes(st.mode) ? t(`chat.mode.${st.mode}`) : st.mode;
       modeBadge.dataset.mode = st.mode;
       const sessions = st.sessions || [];
       sessionSelect.hidden = sessions.length < 2;
@@ -80,7 +73,7 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
       }
       btnApply.disabled = false;
     } catch (err) {
-      modeBadge.textContent = `개발 서버에 연결하지 못했습니다 · make dev를 실행하세요 (${err.message})`;
+      modeBadge.textContent = t('chat.offline', { msg: err.message });
       modeBadge.dataset.mode = 'offline';
     }
   }
@@ -99,11 +92,11 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
     }
     try {
       const res = await transport.request('POST', '/chat/send', { text, context, kind });
-      if (!res.ok) throw new Error(res.error || '전송 실패');
-      if (res.mode === 'manual') notice('에이전트가 아직 받을 준비가 안 돼 대기열에 넣었습니다. 에이전트에게 "frame-mesh 대화 받아 줘"라고 하면 받아 갑니다.');
+      if (!res.ok) throw new Error(res.error || t('chat.sendFailedBody'));
+      if (res.mode === 'manual') notice(t('chat.queuedNotice'));
       refreshStatus();
     } catch (err) {
-      notice(`보내지 못했습니다: ${err.message}`);
+      notice(t('chat.sendFailed', { msg: err.message }));
     }
   }
 
@@ -127,36 +120,36 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
     try {
       handoff = await bridge.call('getHandoff');
     } catch (err) {
-      notice(`전달 묶음을 만들지 못했습니다: ${err.message}`);
+      notice(t('panel.handoffFailed', { msg: err.message }));
       return;
     }
     try {
       const saved = await transport.request('POST', '/handoff', { source: handoff.json.source, markdown: handoff.markdown, json: handoff.json });
-      if (!saved.ok) throw new Error(saved.error || '저장 실패');
+      if (!saved.ok) throw new Error(saved.error || t('panel.saveFailed'));
     } catch (err) {
-      notice(`handoffs/에 저장하지 못했습니다: ${err.message}`);
+      notice(t('chat.saveFailed', { msg: err.message }));
       return;
     }
-    send('지금 적용된 변경을 원본 소스에 반영해 주세요. 변경 목록과 diff는 handoffs/latest.md에 있습니다. 인라인 스타일을 그대로 옮기지 말고 기존 CSS 규칙이나 컴포넌트를 고쳐 주세요.', 'apply');
+    send(t('chat.applyRequest'), 'apply');
   });
 
   // ---------- 제안 카드 ----------
   function proposalCard(p) {
     const card = el('div', 'chat__proposal');
     card.dataset.id = p.id;
-    card.appendChild(el('div', 'chat__proposal-title', `제안 · ${p.summary || p.id}`));
-    card.appendChild(el('div', 'chat__proposal-reason', p.reason ? `이유: ${p.reason}` : '이유가 함께 오지 않았습니다. 대화창에서 이유를 물어보세요.'));
+    card.appendChild(el('div', 'chat__proposal-title', t('chat.proposal', { summary: p.summary || p.id })));
+    card.appendChild(el('div', 'chat__proposal-reason', p.reason ? t('chat.reason', { reason: p.reason }) : t('chat.noReason')));
     if (!p.reason) card.lastChild.classList.add('is-missing');
     const ul = el('ul', 'chat__ops');
     p.ops.forEach((o) => {
-      const what = o.kind === 'style' ? `${o.prop}: ${o.value || '(원래 값)'}` : o.kind === 'text' ? `문구 → "${o.value}"` : `이동 → ${o.parentLabel || '?'} ${(o.index ?? 0) + 1}번째`;
+      const what = o.kind === 'style' ? `${o.prop}: ${o.value || t('chat.opOriginal')}` : o.kind === 'text' ? t('chat.opText', { value: o.value }) : t('chat.opMove', { parent: o.parentLabel || '?', index: (o.index ?? 0) + 1 });
       ul.appendChild(el('li', '', `${o.label} · ${what}`));
     });
     card.appendChild(ul);
     const row = el('div', 'chat__proposal-actions');
-    const btnPreview = el('button', 'btn', '미리보기');
-    const btnAccept = el('button', 'btn btn--primary', '수락');
-    const btnReject = el('button', 'btn', '거절');
+    const btnPreview = el('button', 'btn', t('chat.preview'));
+    const btnAccept = el('button', 'btn btn--primary', t('chat.accept'));
+    const btnReject = el('button', 'btn', t('chat.reject'));
     [btnPreview, btnAccept, btnReject].forEach((b) => { b.type = 'button'; });
     const state = el('span', 'chat__proposal-state', '');
     row.append(btnPreview, btnAccept, btnReject, state);
@@ -169,10 +162,10 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
     };
     // 실패 이유는 카드 안에 남긴다. 알림만 띄우면 놓치기 쉽다.
     const fail = (res) => {
-      const why = (res.errors || [res.error || '알 수 없는 오류']).join(' / ');
-      state.textContent = `적용할 수 없습니다: ${why}`;
+      const why = (res.errors || [res.error || t('chat.unknownError')]).join(' / ');
+      state.textContent = t('chat.cannotApply', { why });
       state.classList.add('is-error');
-      notice(`제안을 적용할 수 없습니다: ${why}`);
+      notice(t('chat.cannotApplyNotice', { why }));
     };
 
     btnPreview.addEventListener('click', async () => {
@@ -180,49 +173,49 @@ export function createChat({ root, transport, bridge, notice = () => {} }) {
       if (view.previewId === p.id) {
         await bridge.call('rejectProposal', p.id);
         view.previewId = null;
-        btnPreview.textContent = '미리보기';
+        btnPreview.textContent = t('chat.preview');
         state.textContent = '';
         return;
       }
       const res = await bridge.call('previewProposal', p.id, p.summary, p.ops, p.reason);
       if (!res.ok) return fail(res);
       view.previewId = p.id;
-      btnPreview.textContent = '미리보기 끄기';
-      state.textContent = '페이지에서 미리보는 중';
+      btnPreview.textContent = t('chat.previewOff');
+      state.textContent = t('chat.previewing');
     });
     btnAccept.addEventListener('click', async () => {
       const res = await bridge.call('acceptProposal', p.id, p.summary, p.ops, p.reason);
       if (!res.ok) return fail(res);
       view.previewId = null;
-      finish('accepted', '수락함 · 변경 로그에 추가');
+      finish('accepted', t('chat.accepted'));
       transport.request('POST', '/chat/proposal', { proposal_id: p.id, status: 'accepted' }).catch(() => {});
     });
     btnReject.addEventListener('click', async () => {
       await bridge.call('rejectProposal', p.id);
       view.previewId = null;
-      finish('rejected', '거절함');
+      finish('rejected', t('chat.rejected'));
       transport.request('POST', '/chat/proposal', { proposal_id: p.id, status: 'rejected' }).catch(() => {});
     });
-    if (p.status && p.status !== 'pending') finish(p.status, p.status === 'accepted' ? '수락함' : '거절함');
+    if (p.status && p.status !== 'pending') finish(p.status, p.status === 'accepted' ? t('chat.acceptedShort') : t('chat.rejected'));
     return card;
   }
 
   // ---------- 이벤트 ----------
   function handle(e) {
     if (e.kind === 'user') {
-      const meta = el('div', 'chat__meta', '보내는 중…');
+      const meta = el('div', 'chat__meta', t('chat.sending'));
       view.deliveries.set(e.request_id, meta);
-      bubble('user', e.request_kind === 'apply' ? `[원본에 반영] ${e.text}` : e.text, meta);
+      bubble('user', e.request_kind === 'apply' ? t('chat.applyTag', { text: e.text }) : e.text, meta);
     } else if (e.kind === 'delivery') {
       const meta = view.deliveries.get(e.request_id);
-      if (meta) meta.textContent = e.state === 'error' ? `${DELIVERY_TEXT.error}: ${e.error || ''} · 다른 방식으로 넘깁니다` : (DELIVERY_TEXT[e.state] || e.state);
+      if (meta) meta.textContent = e.state === 'error' ? t('chat.deliveryFallback', { label: t('chat.delivery.error'), error: e.error || '' }) : (DELIVERY_STATES.includes(e.state) ? t(`chat.delivery.${e.state}`) : e.state);
     } else if (e.kind === 'assistant') {
       const meta = view.deliveries.get(e.request_id);
-      if (meta) meta.textContent = '답변 받음';
+      if (meta) meta.textContent = t('chat.replied');
       bubble('assistant', e.text);
     } else if (e.kind === 'proposal') {
       const meta = view.deliveries.get(e.proposal.request_id);
-      if (meta) meta.textContent = '제안 받음';
+      if (meta) meta.textContent = t('chat.proposed');
       empty.remove();
       const card = proposalCard(e.proposal);
       view.proposals.set(e.proposal.id, card);

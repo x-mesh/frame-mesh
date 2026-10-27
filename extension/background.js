@@ -3,9 +3,9 @@
 // 패널은 탭에 묶지 않는다. 열린 패널이 활성 탭을 따라가야 "지금 보는 페이지"와 어긋나지 않는다.
 chrome.action.onClicked.addListener((tab) => {
   if (!tab.id) return;
-  chrome.sidePanel.open({ windowId: tab.windowId }).catch((err) => console.warn('frame-mesh: 사이드 패널 열기 실패', err));
+  chrome.sidePanel.open({ windowId: tab.windowId }).catch((err) => console.warn('frame-mesh: could not open the side panel', err));
   chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['extension/content.js'] })
-    .catch((err) => console.warn('frame-mesh: 주입 실패', err));
+    .catch((err) => console.warn('frame-mesh: injection failed', err));
 });
 
 // 패널이 따라간 탭에 엔진을 주입한다. content.js의 반환값('host'면 작업실 페이지)을 그대로 돌려준다.
