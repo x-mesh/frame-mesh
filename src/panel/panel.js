@@ -1,6 +1,7 @@
 // 작업실 패널(레이어·속성·변경 목록). 엔진과는 bridge.call(method, ...args)로만 대화하고 상태 스냅샷으로 그린다.
 import { PROP_GROUPS, TEXT_PROP, groupTitle, fieldLabel } from '../core/props.js';
 import { t } from '../core/i18n.js';
+import { isLetterKey } from '../core/keys.js';
 
 const NOTICE_MS = 4000;
 const ARROW_DELTAS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -764,7 +765,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       e.preventDefault();
       return;
     }
-    if (plain && (e.key === 'e' || e.key === 'E') && !e.shiftKey && !e.repeat && view.state) {
+    if (plain && isLetterKey(e, 'e') && !e.shiftKey && !e.repeat && view.state) {
       e.preventDefault();
       call('setMode', view.state.mode === 'select' ? 'interact' : 'select');
       return;
@@ -775,7 +776,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       call('holdInteract', true);
       return;
     }
-    if (mod && e.key.toLowerCase() === 'z') {
+    if (mod && isLetterKey(e, 'z')) {
       e.preventDefault();
       // 입력 중인 필드는 갱신을 건너뛰므로, 되돌리기 전에 포커스를 풀어 값이 갱신되게 한다.
       if (isEditable(e.target)) e.target.blur();

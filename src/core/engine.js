@@ -3,6 +3,7 @@ import { History } from './history.js';
 import { ALL_PROPS, TEXT_PROP } from './props.js';
 import { buildHandoff, describeOp, elementPath } from './handoff.js';
 import { t } from './i18n.js';
+import { isLetterKey } from './keys.js';
 
 const COALESCE_MS = 1000;
 const DRAG_THRESHOLD = 4;
@@ -1222,6 +1223,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function installHooks() {
     doc.documentElement.setAttribute('data-fm-mode', state.mode);
+    if (state.mode === 'select') releasePageFocus();
     listen(doc, 'keydown', onKeydown, true);
     listen(doc, 'keyup', onKeyup, true);
     listen(win, 'blur', () => holdInteract(false));
@@ -1411,6 +1413,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function setMode(mode) {
     state.mode = mode;
     doc.documentElement.setAttribute('data-fm-mode', mode);
+    if (mode === 'select') releasePageFocus();
     hidePicker();
     if (mode !== 'select' && state.editing) finishEdit(true);
     if (mode !== 'select') {
@@ -1716,6 +1719,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     if (state.mode !== 'select' || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    releasePageFocus();
     state.suppressClick = false;
     const hit = targetElement(e);
     if (!hit || hit === doc.body) return;
@@ -2047,6 +2051,14 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     return target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
   }
 
+  // 편집 모드에서는 클릭을 막으므로(preventDefault) 브라우저가 초점을 옮기지 않는다. 네이버 검색창처럼 처음부터
+  // 초점을 가진 페이지 입력란이 남아 있으면 단축키가 모두 그 입력란으로 가므로, 편집 모드에 들어가거나 페이지를 누를 때 초점을 뺀다.
+  function releasePageFocus() {
+    const active = doc.activeElement;
+    if (!active || active === doc.body || state.editing || !isEditable(active)) return;
+    active.blur();
+  }
+
   // 모드 단축키를 받을지. 글자를 입력하는 중이면 넘긴다. 초점이 버튼에 있어도 받는다:
   // Space를 떼는 keyup을 막으므로, 방금 누른 도크 버튼이 다시 눌리지 않는다.
   function modeKeyTarget(e) {
@@ -2086,7 +2098,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       e.preventDefault();
       return;
     }
-    if ((e.key === 'e' || e.key === 'E') && !e.shiftKey && !e.repeat && modeKeyTarget(e)) {
+    if (isLetterKey(e, 'e') && !e.shiftKey && !e.repeat && modeKeyTarget(e)) {
       e.preventDefault();
       e.stopPropagation();
       holdInteract(false);
@@ -2124,7 +2136,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     // 도크의 입력란(Shadow DOM 안)에서 타이핑할 때는 단축키를 가로채지 않는다.
     if (isEditable(e.composedPath()[0])) return;
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.key.toLowerCase() === 'z') {
+    if (mod && isLetterKey(e, 'z')) {
       e.preventDefault();
       if (e.shiftKey) history.redo();
       else history.undo();
