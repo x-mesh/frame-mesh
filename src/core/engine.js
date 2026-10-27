@@ -2053,8 +2053,10 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   // 편집 모드에서는 클릭을 막으므로(preventDefault) 브라우저가 초점을 옮기지 않는다. 네이버 검색창처럼 처음부터
   // 초점을 가진 페이지 입력란이 남아 있으면 단축키가 모두 그 입력란으로 가므로, 편집 모드에 들어가거나 페이지를 누를 때 초점을 뺀다.
+  // 도크의 대화 입력창처럼 Shadow DOM 안에 있는 입력란은 doc.activeElement가 바깥 호스트를 가리키므로 안쪽까지 따라간다.
   function releasePageFocus() {
-    const active = doc.activeElement;
+    let active = doc.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
     if (!active || active === doc.body || state.editing || !isEditable(active)) return;
     active.blur();
   }
