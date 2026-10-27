@@ -1,0 +1,53 @@
+#!/bin/sh
+set -eu
+
+# macOS에는 readlink -f가 없어서 python3로 심볼릭 링크를 풀어 저장소 루트를 구한다.
+self=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$0")
+root=$(dirname "$(dirname "$self")")
+
+usage() {
+	cat <<'EOF'
+Usage: frame-mesh <command> [options]
+
+Commands:
+  dev [--port N] [--bind H]  Start the dev server for the current project
+  mcp                        Run the MCP server (stdio) for Claude Code
+  reply <id> [text]          Reply in the chat (text on stdin if omitted or "-")
+  propose <id> --summary S --reason R [--ops-file F]
+                             Propose a screen change (ops JSON array on stdin or F)
+  state                      Show the selection and changes the user sees
+                             reply, propose, and state accept --url URL
+  connect                    Send chat requests to this Claude Code session (run with ! in the session)
+  whoami                     Show how this Claude Code terminal appears in the chat tab list
+  help                       Show this help
+
+Examples:
+  cd <project> && frame-mesh dev
+  claude mcp add -s user frame-mesh -- frame-mesh mcp
+EOF
+}
+
+command=${1:-help}
+[ "$#" -gt 0 ] && shift
+
+case "$command" in
+dev)
+	target=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+	exec python3 "$root/tools/devserver.py" --target "$target" "$@"
+	;;
+mcp)
+	# Claude Code가 stdio MCP 서버로 띄우므로 exec 전에 stdout으로 아무것도 쓰면 안 된다.
+	exec python3 "$root/tools/fm_mcp.py" "$@"
+	;;
+reply | propose | state | connect | whoami)
+	exec python3 "$root/tools/fm_cli.py" "$command" "$@"
+	;;
+help | -h | --help)
+	usage
+	;;
+*)
+	echo "frame-mesh: unknown command: $command" >&2
+	usage >&2
+	exit 2
+	;;
+esac

@@ -697,7 +697,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     }
   }
 
-  // 전달 묶음을 개발 서버(POST /handoff)로 보내 프로젝트의 handoffs/ 에 파일로 남긴다.
+  // 전달 묶음을 개발 서버(POST /handoff)로 보내 대상 프로젝트의 .frame-mesh/handoffs/ 에 파일로 남긴다.
   async function sendToProject() {
     const url = await receiverStore.get();
     let result;

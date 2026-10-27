@@ -2,18 +2,24 @@
 """frame-mesh MCP 서버 (stdio, 의존성 없음).
 
 AI 에이전트가 frame-mesh 대화에 답하고 화면 변경을 제안할 때 쓰는 도구를 제공한다.
-도구는 개발 서버(make dev)의 /chat/* 에 요청을 전달할 뿐이다.
+도구는 개발 서버(frame-mesh dev 또는 make dev)의 /chat/* 에 요청을 전달할 뿐이다.
+상태 조회와 요청 대기에는 작업 폴더(cwd)를 실어, 서버 하나가 여러 프로젝트를 맡아도 이 세션의 프로젝트로 보내게 한다.
+CLAUDE_CODE_SESSION_ID가 있으면 시작할 때부터 15초마다 세션 ID와 작업 폴더를 /chat/register 로 알린다.
 """
 import json
 import os
 import sys
+import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 
 BASE = os.environ.get("FRAME_MESH_URL", "http://127.0.0.1:4173").rstrip("/")
 SERVER_INFO = {"name": "frame-mesh", "version": "0.1.0"}
 DEFAULT_PROTOCOL = "2025-06-18"
 WAIT_DEFAULT_S = 50
+REGISTER_EVERY_S = 15
+REGISTER_TIMEOUT_S = 3
 
 OPS_SCHEMA = {
     "type": "array",
@@ -52,7 +58,7 @@ TOOLS = [
     },
     {
         "name": "fm_wait_request",
-        "description": "Wait for the next request in the frame-mesh chat when no relay command is set. If a request arrives, return it. If no request arrives in time, return 'no request'. Call this repeatedly only when the user asks you to receive frame-mesh chat requests. Stop after several 'no request' results in a row.",
+        "description": "Wait for the next request in the frame-mesh chat when the chat status is wait or manual (no relay). If a request arrives, return it. If no request arrives in time, return 'no request'. Call this repeatedly only when the user asks you to receive frame-mesh chat requests. Stop after several 'no request' results in a row.",
         "inputSchema": {"type": "object", "properties": {"timeout_seconds": {"type": "integer", "description": f"Maximum wait in seconds (default {WAIT_DEFAULT_S})"}}},
     },
 ]
@@ -70,23 +76,47 @@ def http(method, path, body=None, timeout=10):
         except ValueError:
             return {"ok": False, "error": f"HTTP {err.code}"}
     except (urllib.error.URLError, OSError) as err:
-        return {"ok": False, "error": f"Cannot connect to the development server ({BASE}): {err}. Check that make dev is running."}
+        return {"ok": False, "error": f"Cannot connect to the development server ({BASE}): {err}. Check that frame-mesh dev (or make dev) is running."}
 
 
 def call_tool(name, args):
     if name == "fm_get_state":
-        return http("GET", "/chat/state")
+        return http("GET", "/chat/state?cwd=" + urllib.parse.quote(os.getcwd(), safe=""))
     if name == "fm_reply":
         return http("POST", "/chat/reply", {"request_id": args.get("request_id"), "text": args.get("text")})
     if name == "fm_propose":
         return http("POST", "/chat/propose", {"request_id": args.get("request_id"), "summary": args.get("summary"), "reason": args.get("reason"), "ops": args.get("ops")})
     if name == "fm_wait_request":
         wait = int(args.get("timeout_seconds") or WAIT_DEFAULT_S)
-        res = http("GET", f"/chat/wait?timeout={wait}", timeout=wait + 10)
+        # 서버가 여러 프로젝트를 맡을 수 있어, 이 세션의 작업 폴더로 어느 프로젝트의 요청인지 알린다.
+        query = f"timeout={wait}&cwd=" + urllib.parse.quote(os.getcwd(), safe="")
+        session_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        if session_id:
+            query += "&session_id=" + urllib.parse.quote(session_id, safe="")
+        res = http("GET", f"/chat/wait?{query}", timeout=wait + 10)
         if res.get("ok") and not res.get("request"):
             return {"ok": True, "request": None, "note": "no request"}
         return res
     return {"ok": False, "error": f"Unknown tool: {name}"}
+
+
+def register_loop(session_id):
+    body = {"session_id": session_id, "cwd": os.getcwd(), "pid": os.getppid(), "name": session_id[:8]}
+    while True:
+        try:
+            http("POST", "/chat/register", body, timeout=REGISTER_TIMEOUT_S)
+        except Exception:
+            # stdout은 JSON-RPC 전용이고 stderr도 쓰지 않으므로, hub가 없거나 응답이 깨져도 조용히 다음 주기를 기다린다.
+            pass
+        threading.Event().wait(REGISTER_EVERY_S)
+
+
+def start_registration():
+    session_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    if not session_id:
+        return
+    # daemon이어야 stdin이 닫혀 main()이 끝날 때 프로세스가 바로 종료되고, hub가 45초 안에 세션을 지운다.
+    threading.Thread(target=register_loop, args=(session_id,), daemon=True).start()
 
 
 def respond(msg_id, result=None, error=None):
@@ -120,6 +150,7 @@ def handle(msg):
 
 
 def main():
+    start_registration()
     for line in sys.stdin:
         line = line.strip()
         if not line:

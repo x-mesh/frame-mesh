@@ -6,15 +6,26 @@ PORT ?= 4173
 HOST ?= 127.0.0.1
 URL  := http://$(HOST):$(PORT)/index.html
 JS   := $(wildcard src/*/*.js extension/*.js)
+BIN_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: help dev open check test demo package clean
+.PHONY: help dev install uninstall open check test demo package clean
 
 help: ## 사용할 수 있는 target 목록
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
-dev: ## 개발 서버 실행: 정적 파일 + 전달 묶음 수신(POST /handoff → handoffs/). PORT, HOST 변경 가능
+dev: ## 개발 서버 실행 (대상 = 이 저장소): 정적 파일 + 전달 묶음 수신(POST /handoff → .frame-mesh/handoffs/). PORT, HOST 변경 가능
 	python3 tools/devserver.py --port $(PORT) --bind $(HOST)
+
+install: ## frame-mesh 명령 설치: ~/.local/bin/frame-mesh 심볼릭 링크 만들기 (BIN_DIR 변경 가능)
+	mkdir -p "$(BIN_DIR)"
+	ln -sfn "$(abspath bin/frame-mesh)" "$(BIN_DIR)/frame-mesh"
+	@echo "ok  $(BIN_DIR)/frame-mesh"
+	@case ":$$PATH:" in *":$(BIN_DIR):"*) ;; *) echo '주의: $(BIN_DIR)가 PATH에 없습니다. 셸 설정에 export PATH="$(BIN_DIR):$$PATH"를 추가하세요.' ;; esac
+
+# 링크가 아닌 파일은 사용자가 직접 둔 것일 수 있어 지우지 않는다.
+uninstall: ## frame-mesh 명령 제거: 설치한 심볼릭 링크 지우기
+	@if [ -L "$(BIN_DIR)/frame-mesh" ]; then rm "$(BIN_DIR)/frame-mesh" && echo "ok  removed $(BIN_DIR)/frame-mesh"; else echo "심볼릭 링크가 없어 건너뜁니다: $(BIN_DIR)/frame-mesh"; fi
 
 open: ## 기본 브라우저로 작업실 열기 (서버가 떠 있어야 함)
 	open "$(URL)"

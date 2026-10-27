@@ -130,7 +130,7 @@
       receiver: {
         get: async () => (await chrome.storage.local.get(RECEIVER_KEY))[RECEIVER_KEY] || DEFAULT_RECEIVER,
         set: async (url) => chrome.storage.local.set({ [RECEIVER_KEY]: url || DEFAULT_RECEIVER }),
-        post: (payload) => chatTransport.request('POST', '/handoff', payload),
+        post: (payload) => chatTransport.request('POST', '/handoff', { ...payload, page: location.origin }),
       },
       prefs: {
         get: async () => (await chrome.storage.local.get(DOCK_KEY))[DOCK_KEY] || null,

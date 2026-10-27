@@ -166,19 +166,23 @@ button { cursor: pointer; }
 /* 대화 */
 .chat { display: flex; flex-direction: column; min-height: 0; height: 100%; }
 .chat__head { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-bottom: 1px solid var(--line); flex: none; }
-.chat__mode { font-size: 11px; color: var(--ink-2); }
+.chat__mode { margin-right: auto; font-size: 11px; color: var(--ink-2); }
 .chat__mode::before { content: "●"; margin-right: 4px; color: var(--ink-3); }
 .chat__mode[data-mode="relay"]::before { color: #22c55e; }
 .chat__mode[data-mode="wait"]::before { color: #0d99ff; }
 .chat__mode[data-mode="manual"]::before { color: #f59e0b; }
 .chat__mode[data-mode="offline"]::before { color: #e5484d; }
-.chat__session { margin-left: auto; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; }
+.chat__session { flex: none; max-width: 40%; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; }
 .chat__list { flex: 1; min-height: 0; overflow: auto; padding: 6px 12px; display: flex; flex-direction: column; gap: 6px; }
 .chat__empty { margin: 0; color: var(--ink-3); }
 .chat__msg { max-width: 80%; padding: 6px 9px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
 .chat__msg--user { align-self: flex-end; background: var(--ink); color: #fff; }
 .chat__msg--assistant { align-self: flex-start; background: #f1f1f5; color: var(--ink); }
 .chat__meta { margin-top: 3px; font-size: 10px; opacity: 0.7; }
+/* 응답 대기 중에는 흐림을 글자에만 둔다. 대기 표시는 글자보다 커서 한 줄로 가운데 맞춘다. */
+.chat__meta.is-waiting { display: flex; align-items: center; gap: 5px; opacity: 1; }
+.chat__meta.is-waiting .chat__meta-text { opacity: 0.7; }
+.chat__orb { flex: none; width: 40px; height: 40px; margin: -2px 0 -2px -6px; }
 .chat__proposal { align-self: flex-start; max-width: 90%; padding: 8px 10px; border: 1px solid #b9dcff; border-radius: 8px; background: #f3f9ff; }
 .chat__proposal[data-status="accepted"] { border-color: #a7e3b8; background: #f2fbf4; }
 .chat__proposal[data-status="rejected"] { opacity: 0.6; }

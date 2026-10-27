@@ -194,7 +194,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     chatView.hidden = name !== 'chat';
     dock.classList.toggle('is-chat', name === 'chat');
     if (name === 'chat') {
-      if (!chat && chatTransport) chat = createChat({ root: chatView, transport: chatTransport, bridge, notice: (m) => panel.notice(m) });
+      if (!chat && chatTransport) chat = createChat({ root: chatView, transport: chatTransport, bridge, notice: (m) => panel.notice(m), page: () => win.location.origin });
       if (chat) chat.focus();
     }
   };
