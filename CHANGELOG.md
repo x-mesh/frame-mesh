@@ -4,6 +4,10 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- The README demo GIFs show the current interface: the "Free position" switch, the settings (gear) menu, and English labels.
+
 ## [0.1.1] - 2026-10-27
 
 ### Fixed
