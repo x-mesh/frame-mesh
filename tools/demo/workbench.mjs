@@ -19,7 +19,7 @@ await sleep(800);
 // 녹화가 중간에 실패해도 브라우저 설정과 로그를 녹화 전 상태로 되돌린다.
 let result;
 try {
-  const rec = await createRecorder({ name: 'workbench', captionOn: 'page', captionTop: 76, surfaces: { page: { page, w: W, h: H } } });
+  const rec = await createRecorder({ name: 'workbench', captionOn: 'page', captionTop: 92, surfaces: { page: { page, w: W, h: H } } });
   await rec.setup();
   log('recorder ready');
 

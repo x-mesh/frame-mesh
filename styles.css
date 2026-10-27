@@ -6,14 +6,18 @@ body { background: var(--bg); overflow: hidden; }
   display: grid;
   height: 100vh;
   grid-template-columns: 260px minmax(0, 1fr) 324px;
-  grid-template-rows: 44px minmax(0, 1fr) 190px;
+  grid-template-rows: auto minmax(0, 1fr) 190px;
   grid-template-areas:
     "top top top"
     "left canvas right"
     "bottom bottom bottom";
 }
-.topbar { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.topbar__group { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 버튼 글자가 꺾이거나 세그먼트가 잘리지 않게, 폭이 모자라면 묶음 단위로 다음 줄로 넘긴다. 줄어드는 것은 문서 이름뿐이다. */
+.topbar { grid-area: top; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; min-height: 44px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.topbar__group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.topbar__group:first-child { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; }
+.topbar .btn, .topbar .seg__btn, .topbar .vp-custom { white-space: nowrap; }
+.topbar .seg { flex: none; }
 .doc-name { color: var(--ink-2); font-family: var(--mono); font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vp-custom { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); }
 .vp-custom input { width: 64px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
