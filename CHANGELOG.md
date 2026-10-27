@@ -4,6 +4,11 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- The E and Cmd+Z shortcuts did nothing while the Korean input method was on. They now also match the physical key.
+- On pages that put focus in an input on load, such as naver.com, every shortcut went to that input until you clicked a dock button. Edit mode now releases focus from page inputs and from the dock chat input when editing starts and when you click the page.
+
 ## [0.1.0] - 2026-10-27
 
 First release. Select, move, resize, and restyle elements on a live web page, review the changes against the original, and hand them to an AI coding agent that applies them to your source.
