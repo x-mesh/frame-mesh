@@ -2,10 +2,12 @@
 import { createEngine } from '../core/engine.js';
 import { createPanel } from '../panel/panel.js';
 import { createChat } from '../panel/chat.js';
-import { t, setLang, getLang, applyI18n } from '../core/i18n.js';
+import { t, setLang, getLang, applyI18n, LANGS, LANG_NAMES } from '../core/i18n.js';
 
-// 언어는 브라우저 언어를 따르고, 주소의 ?lang=en|ko가 있으면 그 값을 쓴다. 패널을 만들기 전에 정해야 라벨이 그 언어로 그려진다.
-const forcedLang = new URLSearchParams(location.search).get('lang');
+// 언어 우선순위: 주소의 ?lang=en|ko → ⋯ 메뉴에서 고른 값(localStorage) → 브라우저 언어.
+// 패널을 만들기 전에 정해야 라벨이 그 언어로 그려진다.
+const LANG_KEY = 'fm:lang';
+const forcedLang = new URLSearchParams(location.search).get('lang') || localStorage.getItem(LANG_KEY);
 if (forcedLang) setLang(forcedLang);
 document.documentElement.lang = getLang();
 document.title = t('wb.title');
@@ -54,7 +56,7 @@ const bridge = {
 const panel = createPanel({
   els: {
     tree: $('tree'), props: $('props'), changes: $('changes'), changeCount: $('changeCount'),
-    btnUndo: $('btnUndo'), btnRedo: $('btnRedo'), modeSeg: $('modeSeg'), moveSeg: $('moveSeg'), btnHandoff: $('btnHandoff'), btnCopyLog: $('btnCopyLog'), btnMeasure: $('btnMeasure'), btnXray: $('btnXray'), btnFocus: $('btnFocus'), btnPeek: $('btnPeek'), btnDiffView: $('btnDiffView'), diff: $('diff'),
+    btnUndo: $('btnUndo'), btnRedo: $('btnRedo'), modeSeg: $('modeSeg'), moveToggle: $('moveToggle'), btnHandoff: $('btnHandoff'), btnCopyLog: $('btnCopyLog'), btnMeasure: $('btnMeasure'), btnXray: $('btnXray'), btnFocus: $('btnFocus'), btnPeek: $('btnPeek'), btnDiffView: $('btnDiffView'), diff: $('diff'),
     btnSendLog: $('btnSendLog'), btnClearLog: $('btnClearLog'),
     notice: $('notice'),
     handoff: { dialog: $('handoffDialog'), text: $('handoffText'), summary: $('handoffSummary'), btnCopy: $('btnHandoffCopy'), btnMd: $('btnHandoffMd'), btnJson: $('btnHandoffJson'), btnClose: $('btnHandoffClose') },
@@ -65,14 +67,50 @@ const panel = createPanel({
 
 // 변경 로그를 문서 이름 단위로 보관해 새로고침 뒤 복원한다.
 let saveTimer = 0;
+function saveLogNow() {
+  clearTimeout(saveTimer);
+  if (!state.engine) return;
+  const data = state.engine.exportOps();
+  if (!data.ops.length) localStorage.removeItem(logKey());
+  else localStorage.setItem(logKey(), JSON.stringify({ savedAt: Date.now(), ...data }));
+}
+
 function persistLog() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    if (!state.engine) return;
-    const data = state.engine.exportOps();
-    if (!data.ops.length) localStorage.removeItem(logKey());
-    else localStorage.setItem(logKey(), JSON.stringify({ savedAt: Date.now(), ...data }));
-  }, SAVE_DEBOUNCE_MS);
+  saveTimer = setTimeout(saveLogNow, SAVE_DEBOUNCE_MS);
+}
+
+// ---------- ⋯ 메뉴: 언어 ----------
+// 라벨을 모두 새 언어로 그리려면 작업실을 다시 열어야 한다. 직접 연 HTML은 다시 열면 사라지므로 그때만 확인한다.
+function installMoreMenu() {
+  const menu = $('moreMenu');
+  const pop = menu.querySelector('.menu__pop');
+  $('btnMore').setAttribute('aria-label', t('wb.settingsTitle'));
+  $('btnMore').addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.hidden = !pop.hidden;
+  });
+  document.addEventListener('click', (e) => { if (!menu.contains(e.target)) pop.hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') pop.hidden = true; });
+  const seg = $('langSeg');
+  LANGS.forEach((lang) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `seg__btn${lang === getLang() ? ' is-active' : ''}`;
+    b.dataset.lang = lang;
+    b.textContent = LANG_NAMES[lang];
+    seg.appendChild(b);
+  });
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('.seg__btn');
+    if (!b || b.dataset.lang === getLang()) return;
+    if (state.sourceName && state.sourceName !== DEFAULT_SOURCE && !window.confirm(t('wb.langReloadConfirm'))) return;
+    saveLogNow();
+    localStorage.setItem(LANG_KEY, b.dataset.lang);
+    const url = new URL(location.href);
+    url.searchParams.delete('lang');
+    location.replace(url);
+  });
 }
 
 function restoreLog() {
@@ -242,6 +280,7 @@ function renderStatus() {
 // ---------- 초기화 ----------
 function init() {
   renderViewportButtons();
+  installMoreMenu();
   // 웹 작업실은 개발 서버와 같은 출처라 바로 요청한다.
   const transport = {
     request: async (method, path, body) => {

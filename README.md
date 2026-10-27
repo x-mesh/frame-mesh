@@ -20,7 +20,7 @@ frame-mesh has two hosts. Both use the same editor engine.
 frame-mesh changes only inline styles and the DOM order in the browser. It does not write to your source files.
 
 > [!NOTE]
-> The interface is in English and Korean. It follows the browser language. In the web workbench, add `?lang=en` or `?lang=ko` to the URL to select a language.
+> The interface is in English and Korean. By default, it follows the browser language. To change it, click the gear (settings) button in the dock or in the top bar of the web workbench, and select a language under "Language". In the web workbench, `?lang=en` or `?lang=ko` in the URL also selects a language.
 
 ## Requirements
 
@@ -78,7 +78,7 @@ The extension requests access to all sites (`<all_urls>`). It injects code only 
 | Double-click | Selects one level deeper. On a text-only element, it starts a text edit. |
 | ⌘-click (Ctrl-click on Windows) | Selects the deepest element. |
 | Right-click | Shows a list of all elements at that point. |
-| Drag | Changes the order or the parent in the same layout flow. Hold ⌥ (Option) to move the element with a `position: relative` offset. |
+| Drag | Changes the order or the parent in the same layout flow. If the "Free position" switch is on, it moves the element with a `position: relative` offset. Hold ⌥ (Option) to use the other mode. |
 | Handles on the selection box | Change the width and height. Hold Shift on a corner handle to keep the aspect ratio. |
 | Arrow keys | Move the element 1px. Hold Shift to move it 10px. |
 | Enter | Starts a text edit on a text-only element. Press Enter to keep the text, or Esc to cancel. |
@@ -86,7 +86,7 @@ The extension requests access to all sites (`<all_urls>`). It injects code only 
 | E | Switches between edit mode and normal page use. The extension accepts E only while the side panel is open. |
 | Hold Space | Lets you use the page for a moment. Release Space to return to edit mode with the same selection and overlays. |
 
-In edit mode, frame-mesh blocks links and page navigation. A blue top border on the dock shows that edit mode is on. To use the page, turn off the "Editing" switch at the left end of the dock, or press E.
+In edit mode, frame-mesh blocks links and page navigation. A blue top border on the dock shows that edit mode is on. To use the page, turn off the "Editing" switch at the left end of the dock, or press E. The "Free position" switch next to it sets the drag mode.
 
 ### Property panel
 
@@ -116,7 +116,7 @@ Each changed element gets an orange dashed outline and a number. The dock shows 
 - **Log**: lists the changes in order. Click an entry to keep only the changes up to that point.
 - **Summary**: shows the first and the last value of each element as a diff (`-` / `+`).
 - **Show original**: removes the changes for a moment and shows the original page. Press Esc or start an edit to go back.
-- **Reset**: removes all changes at once. The log stays, so redo can restore the changes one by one. To clear the log too, open the ⋯ menu in the dock and select "Revert all and clear log".
+- **Reset**: removes all changes at once. The log stays, so redo can restore the changes one by one. To clear the log too, click the gear button in the dock and select "Revert all and clear log".
 
 frame-mesh saves the change log for each page URL and applies it again after a reload. If frame-mesh cannot find an element, the change shows as "Restore failed". For elements that render late, frame-mesh tries again for 15 seconds.
 

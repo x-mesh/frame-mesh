@@ -1,6 +1,8 @@
 // 화면 문구 사전. 웹 작업실은 확장 밖에서도 같은 엔진을 쓰므로 chrome.i18n 대신 이 모듈을 쓴다.
 // 항목은 [영어, 한국어] 순서이고, 문구 안의 {name}은 t()의 두 번째 인자로 채운다.
-const LANGS = ['en', 'ko'];
+export const LANGS = ['en', 'ko'];
+// 언어 이름은 화면 언어와 상관없이 그 언어로 쓴다.
+export const LANG_NAMES = { en: 'English', ko: '한국어' };
 
 const MESSAGES = {
   // 속성 패널 묶음과 필드
@@ -183,10 +185,6 @@ const MESSAGES = {
   'panel.cleared': ['Cleared the log and reverted all changes.', '로그를 지우고 변경을 모두 되돌렸습니다.'],
   // 도크·작업실 도구 모음 (확장 도크와 웹 작업실이 함께 쓴다)
   'dock.modeTitle': ['On: select and edit elements. Off: use the page as usual. E: switch · Hold Space: use the page for a moment', '켜면 요소를 고르고 편집합니다. 끄면 페이지를 원래대로 씁니다. E: 전환 · Space를 누르는 동안: 잠깐 페이지 사용'],
-  'move.title': ['Hold ⌥ (Option) while you drag to use the other mode.', '⌥(Option)을 누른 채 끌면 반대 방식으로 움직입니다.'],
-  'move.titleWb': ['Sets the default move mode for a drag. Hold ⌥ (Option) while you drag to use the other mode.', '드래그할 때의 기본 이동 방식을 정합니다. ⌥(Option)을 누른 채 끌면 반대 방식으로 움직입니다.'],
-  'move.flow': ['Flow', '흐름 이동'],
-  'move.free': ['Free', '자유 위치'],
   'view.measure': ['Measure', '측정'],
   'view.measureTitle': ['Show rulers, guides, coordinates, and distances', '눈금자·가이드·좌표·거리 표시'],
   'view.xray': ['Outline', '분해'],
@@ -198,7 +196,6 @@ const MESSAGES = {
   'dock.view': ['View ▾', '보기 ▾'],
   'dock.viewTitle': ['Overlays and drag mode', '표시 옵션과 드래그 방식'],
   'dock.overlays': ['Overlays on the page', '페이지 위 표시'],
-  'dock.dragMode': ['Drag mode', '드래그 방식'],
   'peek.title': ['Remove the changes for a moment and show the original page (Esc to go back)', '변경을 지우지 않고 잠시 걷어 내 원래 화면 보기 (Esc로 돌아가기)'],
   'dock.undo': ['Undo', '되돌리기'],
   'dock.undoTitle': ['Undo the last change (⌘Z)', '방금 한 변경 되돌리기 (⌘Z)'],
@@ -223,7 +220,6 @@ const MESSAGES = {
   'dock.viewFileTitle': ['Show the handoff and save it as .md or .json', '전달 묶음을 보고 .md/.json으로 저장'],
   'dock.clear': ['Revert all and clear log', '모두 되돌리고 로그 지우기'],
   'dock.clearTitle': ['Revert all changes and delete the log', '변경을 모두 되돌리고 로그 삭제'],
-  'dock.moreTitle': ['Save and clear', '저장과 지우기'],
   'dock.collapseTitle': ['Collapse or expand the log', '로그 접기/펼치기'],
   'dock.grip': ['Drag to resize', '끌어서 높이 조절'],
   'dock.peekbar': ['Showing the original · Your changes are kept · Edit or press Esc to go back', '원본 보기 중 · 변경은 그대로 있습니다 · 편집하거나 Esc를 누르면 돌아갑니다'],
@@ -357,6 +353,16 @@ const MESSAGES = {
   'wb.overflow': ['Horizontal overflow {n}px', '가로 넘침 {n}px'],
   // 빈 변경 로그
   'panel.changesEmpty': ['No changes yet. Select an element on the page and adjust it.', '아직 변경이 없습니다. 미리보기에서 요소를 선택해 조정하세요.'],
+  // 언어 메뉴와 드래그 방식 스위치
+  'move.switch': ['Free position', '자유 위치'],
+  'move.switchTitle': ['Off: a drag reorders elements in the layout flow. On: a drag moves the element freely with a position offset. Hold ⌥ (Option) while you drag to use the other mode.', '끄면 드래그로 레이아웃 흐름 안의 순서를 바꿉니다. 켜면 위치 오프셋으로 자유롭게 옮깁니다. ⌥(Option)을 누른 채 끌면 반대 방식으로 움직입니다.'],
+  'lang.label': ['Language', '언어'],
+  'wb.langReloadConfirm': ['Changing the language reloads the workbench and closes the HTML file that you opened. Continue?', '언어를 바꾸면 작업실을 다시 열어 직접 연 HTML 파일이 닫힙니다. 계속할까요?'],
+  // 설정 메뉴
+  'dock.settingsTitle': ['Handoff and settings', '전달과 설정'],
+  'menu.handoff': ['Handoff', '전달'],
+  'menu.settings': ['Settings', '설정'],
+  'wb.settingsTitle': ['Settings', '설정'],
   // @end
 };
 

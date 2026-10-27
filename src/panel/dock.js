@@ -1,8 +1,10 @@
 // 확장용 페이지 안 하단 도크: 도구 모음과 변경 로그, 전달 버튼을 전체 폭으로 둔다. 사이드 패널은 레이어·속성만 맡는다.
 import { createPanel } from './panel.js';
 import { createChat } from './chat.js';
-import { t } from '../core/i18n.js';
+import { t, getLang, LANGS, LANG_NAMES } from '../core/i18n.js';
 
+// 톱니바퀴 아이콘: Feather Icons "settings" (MIT). 글자 ⚙는 운영체제마다 이모지로 보이거나 크기가 달라 SVG를 쓴다.
+const GEAR_SVG = '<svg class="icon-gear" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 const DOCK_MIN_H = 96;
 const DOCK_DEFAULT_H = 180;
 const DOCK_MAX_RATIO = 0.6;
@@ -21,14 +23,6 @@ const DOCK_CSS = `
 .btn--history:disabled { color: var(--ink-3); font-weight: 400; opacity: 0.6; }
 /* 편집 중에는 위 테두리를 파란색으로 칠해 버튼을 보지 않아도 모드를 알 수 있게 한다. */
 .dock.is-editing { border-top: 3px solid var(--accent); }
-.mode-switch { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: #f1f1f4; color: var(--ink-2); font: 600 12px/1.2 var(--font); cursor: pointer; }
-.mode-switch__track { position: relative; width: 30px; height: 18px; border-radius: 999px; background: #c4c4cc; transition: background 0.12s; flex: none; }
-.mode-switch__track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 0.12s; }
-.mode-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.mode-switch[aria-checked="true"] .mode-switch__track { background: rgba(255,255,255,0.35); }
-.mode-switch[aria-checked="true"] .mode-switch__track::after { transform: translateX(12px); }
-.mode-switch kbd { font: 11px var(--mono); padding: 0 4px; border-radius: 3px; background: rgba(0,0,0,0.08); }
-.mode-switch[aria-checked="true"] kbd { background: rgba(255,255,255,0.25); }
 .dock.is-collapsed .changes, .dock.is-collapsed .dock__grip, .dock.is-collapsed .dock__status { display: none; }
 .dock__grip { height: 6px; cursor: ns-resize; flex: none; }
 .dock__grip:hover, .dock__grip.is-active { background: var(--accent-soft); }
@@ -57,22 +51,6 @@ const DOCK_CSS = `
 .applied.is-clean::before { color: #22c55e; }
 .dock__tab span { margin-left: 4px; color: var(--ink-3); font-family: var(--mono); font-size: 10px; }
 .dock__tab.is-active span { color: rgba(255,255,255,0.7); }
-.menu { position: relative; display: inline-block; }
-.menu__pop { position: absolute; bottom: calc(100% + 6px); min-width: 210px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.16); z-index: 2; }
-.menu__pop[hidden] { display: none; }
-.menu--left .menu__pop { left: 0; }
-.menu--right .menu__pop { right: 0; }
-.menu__label { padding: 4px 6px 2px; color: var(--ink-3); font-size: 10px; }
-.menu__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; background: none; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
-.menu__item:hover:not(:disabled) { background: #f4f4f7; }
-.menu__item:disabled { color: var(--ink-3); cursor: default; }
-.menu__item::before { content: ""; width: 14px; color: var(--accent); font-weight: 700; flex: none; }
-.menu__item.is-active::before { content: "✓"; }
-.menu__item--danger { color: #b42318; }
-.menu__seg { padding: 2px 6px 6px; }
-.menu__seg .seg { display: flex; width: 100%; }
-.menu__seg .seg__btn { flex: 1; }
-.menu__div { height: 1px; margin: 4px 0; background: var(--line); }
 .dock .change { grid-template-columns: 22px 58px minmax(80px, 180px) 1fr; padding: 3px 12px; }
 .dock .change__vp { display: none; }
 .dock .change__target { color: var(--ink-2); }
@@ -110,7 +88,7 @@ function h(doc, tag, attrs = {}, children = []) {
   return el;
 }
 
-export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTransport, onOpenPanel }) {
+export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTransport, onOpenPanel, onLanguage }) {
   const host = doc.createElement('fm-dock');
   host.setAttribute('data-fm-ui', '');
   const root = host.attachShadow({ mode: 'open' });
@@ -126,6 +104,12 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const menus = [];
   const menu = (id, label, title, side, children) => {
     const trigger = el('button', { class: 'btn', id, type: 'button', title, text: label });
+    if (label === GEAR_SVG) {
+      trigger.textContent = '';
+      trigger.innerHTML = GEAR_SVG;
+      trigger.classList.add('btn--icon');
+      trigger.setAttribute('aria-label', title);
+    }
     const pop = el('div', { class: 'menu__pop' }, children);
     pop.hidden = true;
     trigger.addEventListener('click', (e) => {
@@ -140,19 +124,18 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   root.addEventListener('click', (e) => {
     if (!e.composedPath().some((n) => n.classList && n.classList.contains('menu'))) menus.forEach((m) => { m.hidden = true; });
   });
-  doc.addEventListener('click', (e) => { if (!e.composedPath().includes(host)) menus.forEach((m) => { m.hidden = true; }); }, true);
+  const closeMenusOutside = (e) => { if (!e.composedPath().includes(host)) menus.forEach((m) => { m.hidden = true; }); };
+  doc.addEventListener('click', closeMenusOutside, true);
 
   const modeLabel = el('span', { text: t('mode.editing') });
   const modeToggle = el('button', { class: 'mode-switch', id: 'modeToggle', type: 'button', role: 'switch', 'aria-checked': 'true', title: t('dock.modeTitle') }, [el('span', { class: 'mode-switch__track' }), modeLabel, el('kbd', { text: 'E' })]);
-  const moveSeg = el('div', { class: 'seg', id: 'moveSeg', title: t('move.title') }, [segBtn('data-move', 'flow', t('move.flow'), true), segBtn('data-move', 'free', t('move.free'))]);
+  const moveToggle = el('button', { class: 'mode-switch mode-switch--sub', id: 'moveToggle', type: 'button', role: 'switch', 'aria-checked': 'false', title: t('move.switchTitle') }, [el('span', { class: 'mode-switch__track' }), el('span', { text: t('move.switch') })]);
   const btnMeasure = menuItem('btnMeasure', t('view.measure'), t('view.measureTitle'));
   const btnXray = menuItem('btnXray', t('view.xray'), t('view.xrayTitle'));
   const btnFocus = menuItem('btnFocus', t('view.focus'), t('view.focusTitle'));
   const btnDiffView = menuItem('btnDiffView', t('view.diff'), t('view.diffTitle'));
   const viewMenu = menu('btnView', t('dock.view'), t('dock.viewTitle'), 'left', [
     el('div', { class: 'menu__label', text: t('dock.overlays') }), btnMeasure, btnXray, btnFocus, btnDiffView,
-    el('div', { class: 'menu__div' }),
-    el('div', { class: 'menu__label', text: t('dock.dragMode') }), el('div', { class: 'menu__seg' }, [moveSeg]),
   ]);
   const btnPeek = btn('btnPeek', t('panel.peek'), t('peek.title'));
   const historyBtn = (id, glyph, text, title) => el('button', { class: 'btn btn--history', id, type: 'button', title }, [el('span', { class: 'btn__glyph', text: glyph }), el('span', { text })]);
@@ -174,10 +157,22 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const btnHandoff = menuItem('btnHandoff', t('dock.viewFile'), t('dock.viewFileTitle'));
   const btnClearLog = menuItem('btnClearLog', t('dock.clear'), t('dock.clearTitle'), ' menu__item--danger');
   [btnSendLog, btnHandoff, btnClearLog].forEach((b) => b.addEventListener('click', () => menus.forEach((m) => { m.hidden = true; })));
-  const moreMenu = menu('btnMore', '⋯', t('dock.moreTitle'), 'right', [btnSendLog, btnHandoff, el('div', { class: 'menu__div' }), btnClearLog]);
+  // 언어는 자주 바꾸지 않으므로 톱니바퀴 메뉴의 설정 구획에 둔다. 저장과 다시 그리기는 도크를 띄운 호스트가 맡는다.
+  const langSeg = el('div', { class: 'seg', id: 'langSeg' }, LANGS.map((l) => segBtn('data-lang', l, LANG_NAMES[l], l === getLang())));
+  langSeg.addEventListener('click', (e) => {
+    const b = e.target.closest('.seg__btn');
+    if (!b || b.dataset.lang === getLang() || !onLanguage) return;
+    menus.forEach((m) => { m.hidden = true; });
+    onLanguage(b.dataset.lang);
+  });
+  const moreMenu = menu('btnMore', GEAR_SVG, t('dock.settingsTitle'), 'right', [
+    el('div', { class: 'menu__heading', text: t('menu.handoff') }), btnSendLog, btnHandoff, btnClearLog,
+    el('div', { class: 'menu__div' }),
+    el('div', { class: 'menu__heading', text: t('menu.settings') }), el('div', { class: 'menu__label', text: t('lang.label') }), el('div', { class: 'menu__seg' }, [langSeg]),
+  ]);
   const btnCollapse = btn('btnCollapse', '▾', t('dock.collapseTitle'), ' icon');
   const bar = el('div', { class: 'dock__bar' }, [
-    el('div', { class: 'dock__group' }, [modeToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset]),
+    el('div', { class: 'dock__group' }, [modeToggle, moveToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset]),
     el('div', { class: 'dock__group' }, [applied, tabs, btnCopyLog, moreMenu, btnCollapse]),
   ]);
   const grip = el('div', { class: 'dock__grip', title: t('dock.grip') });
@@ -235,7 +230,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
 
   const panel = createPanel({
     els: {
-      tree: el('div'), props: el('div'), changes, diff: diffView, btnPeek, btnDiffView, changeCount, btnUndo, btnRedo, btnReset, modeToggle, modeLabel, moveSeg,
+      tree: el('div'), props: el('div'), changes, diff: diffView, btnPeek, btnDiffView, changeCount, btnUndo, btnRedo, btnReset, modeToggle, modeLabel, moveToggle,
       btnHandoff, btnCopyLog, btnSendLog, btnClearLog, btnMeasure, btnXray, btnFocus, notice,
       handoff: { dialog, text: handoffText, summary: handoffSummary, btnCopy: btnHandoffCopy, btnMd: btnHandoffMd, btnJson: btnHandoffJson, btnClose: btnHandoffClose, receiverInput },
     },
@@ -325,5 +320,12 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     renderApplied();
   }
 
-  return { host, update, setVisible, notice: panel.notice };
+  // 언어를 바꿀 때 도크를 새로 만든다. 이전 도크의 문서 리스너와 대화 폴링이 남지 않게 걷어 낸다.
+  function destroy() {
+    doc.removeEventListener('click', closeMenusOutside, true);
+    if (chat) chat.destroy();
+    host.remove();
+  }
+
+  return { host, update, setVisible, notice: panel.notice, destroy };
 }

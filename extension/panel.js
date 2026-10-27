@@ -8,6 +8,10 @@ const storedLang = (await chrome.storage.local.get('fm:lang'))['fm:lang'];
 if (storedLang) setLang(storedLang);
 document.documentElement.lang = getLang();
 applyI18n(document);
+// 도크의 언어 메뉴에서 바꾸면 패널도 새 언어로 다시 연다. 패널은 다시 열면 대상 탭에 저절로 붙는다.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && 'fm:lang' in changes) location.reload();
+});
 
 const $ = (id) => document.getElementById(id);
 // 새로고침 직후에는 콘텐츠 스크립트가 아직 뜨기 전일 수 있어 연결을 몇 번 다시 시도한다.

@@ -192,3 +192,37 @@ button { cursor: pointer; }
 .chat__proposal-state.is-error { color: #b42318; }
 .chat__proposal-reason { margin: 0 0 6px; color: var(--ink-2); line-height: 1.5; }
 .chat__proposal-reason.is-missing { color: var(--ink-3); font-style: italic; }
+
+/* 스위치와 펼침 메뉴. 확장 도크와 웹 작업실 상단이 함께 쓴다. */
+.mode-switch { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: #f1f1f4; color: var(--ink-2); font: 600 12px/1.2 var(--font); cursor: pointer; }
+.mode-switch__track { position: relative; width: 30px; height: 18px; border-radius: 999px; background: #c4c4cc; transition: background 0.12s; flex: none; }
+.mode-switch__track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 0.12s; }
+.mode-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mode-switch[aria-checked="true"] .mode-switch__track { background: rgba(255,255,255,0.35); }
+.mode-switch[aria-checked="true"] .mode-switch__track::after { transform: translateX(12px); }
+.mode-switch kbd { font: 11px var(--mono); padding: 0 4px; border-radius: 3px; background: rgba(0,0,0,0.08); }
+.mode-switch[aria-checked="true"] kbd { background: rgba(255,255,255,0.25); }
+.menu { position: relative; display: inline-block; }
+.menu__pop { position: absolute; bottom: calc(100% + 6px); min-width: 210px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.16); z-index: 2; }
+.menu__pop[hidden] { display: none; }
+.menu--left .menu__pop { left: 0; }
+.menu--right .menu__pop { right: 0; }
+.menu__label { padding: 4px 6px 2px; color: var(--ink-3); font-size: 10px; }
+.menu__heading { padding: 6px 6px 2px; color: var(--ink-2); font-size: 11px; font-weight: 700; }
+/* 아이콘만 있는 버튼. 글자 버튼과 높이를 맞춘다. */
+.btn--icon { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; }
+.btn--icon svg { display: block; }
+.menu__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; background: none; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.menu__item:hover:not(:disabled) { background: #f4f4f7; }
+.menu__item:disabled { color: var(--ink-3); cursor: default; }
+.menu__item::before { content: ""; width: 14px; color: var(--accent); font-weight: 700; flex: none; }
+.menu__item.is-active::before { content: "✓"; }
+.menu__item--danger { color: #b42318; }
+.menu__seg { padding: 2px 6px 6px; }
+.menu__seg .seg { display: flex; width: 100%; }
+.menu__seg .seg__btn { flex: 1; }
+.menu__div { height: 1px; margin: 4px 0; background: var(--line); }
+/* 드래그 방식처럼 보조 설정용 스위치는 편집 스위치(파랑)와 구분되게 진한 회색으로 켠다. */
+.mode-switch--sub[aria-checked="true"] { background: var(--ink); border-color: var(--ink); }
+/* 화면 위쪽에 있는 메뉴(웹 작업실 상단)는 아래로 펼친다. */
+.menu--down .menu__pop { bottom: auto; top: calc(100% + 6px); }

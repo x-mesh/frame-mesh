@@ -19,7 +19,7 @@
   document.documentElement.setAttribute('data-fm-owner', instanceId);
   document.dispatchEvent(new CustomEvent('fm:shutdown'));
   document.querySelectorAll('fm-overlay, fm-dock').forEach((n) => n.remove());
-  const boot = { ports: new Set(), engine: null, dock: null, restored: false, saveTimer: 0, t: null };
+  const boot = { ports: new Set(), engine: null, dock: null, restored: false, saveTimer: 0, t: null, i18n: null };
   // 사전 모듈은 엔진보다 먼저 불러온다. 그 전에 나가는 오류 문구만 영어 기본값을 쓴다.
   const tr = (key, vars, fallback) => (boot.t ? boot.t(key, vars) : fallback);
   document.addEventListener('fm:shutdown', () => {
@@ -34,6 +34,7 @@
   });
   const RECEIVER_KEY = 'fm:receiver';
   const DOCK_KEY = 'fm:dock';
+  const LANG_KEY = 'fm:lang';
   const DEFAULT_RECEIVER = 'http://127.0.0.1:4173/handoff';
   window.__frameMesh = boot;
   boot.alive = () => {
@@ -138,6 +139,7 @@
       chatTransport,
       // 사이드 패널은 사용자 동작 안에서만 열 수 있어, 클릭 처리 중에 바로 요청한다.
       onOpenPanel: () => chrome.runtime.sendMessage({ type: 'open-panel' }).catch(() => {}),
+      onLanguage: (lang) => chrome.storage.local.set({ [LANG_KEY]: lang }),
     });
     engine.registerUiRoot(dock.host);
     boot.dock = dock;
@@ -147,6 +149,15 @@
     dock.setVisible(boot.ports.size > 0);
   }
   boot.announce = () => broadcast(null);
+
+  // 도크나 사이드 패널에서 언어를 바꾸면 도크를 새 언어로 다시 만든다. 설정을 지우면 브라우저 언어로 돌아간다.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !(LANG_KEY in changes) || !boot.i18n || !boot.engine) return;
+    boot.i18n.setLang(changes[LANG_KEY].newValue || navigator.language);
+    if (boot.dock) boot.dock.destroy();
+    boot.dock = null;
+    mountDock(boot.engine).then(() => broadcast(null)).catch((err) => console.error('frame-mesh: dock failed to load', err));
+  });
 
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'fm-panel') return;
@@ -186,9 +197,10 @@
 
   // 언어는 브라우저 언어를 따르고, chrome.storage의 fm:lang('en' | 'ko')이 있으면 그 값을 쓴다.
   import(chrome.runtime.getURL('src/core/i18n.js')).then(async (i18n) => {
-    const lang = (await chrome.storage.local.get('fm:lang'))['fm:lang'];
+    const lang = (await chrome.storage.local.get(LANG_KEY))[LANG_KEY];
     if (lang) i18n.setLang(lang);
     boot.t = i18n.t;
+    boot.i18n = i18n;
     return import(chrome.runtime.getURL('src/core/engine.js'));
   }).then(({ createEngine }) => {
     const engine = createEngine({

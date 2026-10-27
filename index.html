@@ -29,10 +29,7 @@
         <button class="seg__btn is-active" type="button" data-mode="select" data-i18n="wb.select"></button>
         <button class="seg__btn" type="button" data-mode="interact" data-i18n="wb.interact"></button>
       </div>
-      <div class="seg" id="moveSeg" data-i18n-title="move.titleWb">
-        <button class="seg__btn is-active" type="button" data-move="flow" data-i18n="move.flow"></button>
-        <button class="seg__btn" type="button" data-move="free" data-i18n="move.free"></button>
-      </div>
+      <button class="mode-switch mode-switch--sub" id="moveToggle" type="button" role="switch" aria-checked="false" data-i18n-title="move.switchTitle"><span class="mode-switch__track"></span><span data-i18n="move.switch"></span></button>
       <button class="btn" id="btnMeasure" type="button" data-i18n="view.measure" data-i18n-title="view.measureTitle"></button>
       <button class="btn" id="btnXray" type="button" data-i18n="view.xray" data-i18n-title="view.xrayTitle"></button>
       <button class="btn" id="btnFocus" type="button" data-i18n="view.focus" data-i18n-title="view.focusTitle"></button>
@@ -41,6 +38,14 @@
       <button class="btn" id="btnUndo" type="button" data-i18n="wb.undo" data-i18n-title="wb.undoTitle" disabled></button>
       <button class="btn" id="btnRedo" type="button" data-i18n="dock.redo" data-i18n-title="wb.redoTitle" disabled></button>
       <button class="btn btn--primary" id="btnHandoff" type="button" data-i18n="handoff.dialogTitle" data-i18n-title="wb.handoffTitle"></button>
+      <div class="menu menu--right menu--down" id="moreMenu">
+        <!-- 톱니바퀴 아이콘: Feather Icons "settings" (MIT) -->
+        <button class="btn btn--icon" id="btnMore" type="button" data-i18n-title="wb.settingsTitle"><svg class="icon-gear" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        <div class="menu__pop" hidden>
+          <div class="menu__label" data-i18n="lang.label"></div>
+          <div class="menu__seg"><div class="seg" id="langSeg"></div></div>
+        </div>
+      </div>
     </div>
   </header>
 

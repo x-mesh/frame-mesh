@@ -592,11 +592,8 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
         if (b) call('setMode', b.dataset.mode);
       });
     }
-    if (els.moveSeg) {
-      els.moveSeg.addEventListener('click', (e) => {
-        const b = e.target.closest('.seg__btn');
-        if (b) call('setMoveMode', b.dataset.move);
-      });
+    if (els.moveToggle) {
+      els.moveToggle.addEventListener('click', () => call('setMoveMode', view.state && view.state.moveMode === 'free' ? 'flow' : 'free'));
     }
     if (els.btnMeasure) els.btnMeasure.addEventListener('click', () => call('setMeasure', !(view.state && view.state.measure)));
     if (els.btnXray) els.btnXray.addEventListener('click', () => call('setXray', !(view.state && view.state.xray)));
@@ -648,7 +645,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       els.modeLabel.textContent = state.mode === 'select' ? t('mode.editing') : state.holding ? t('mode.holding') : t('mode.using');
     }
     if (els.modeSeg) els.modeSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === state.mode));
-    if (els.moveSeg) els.moveSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.move === state.moveMode));
+    if (els.moveToggle) els.moveToggle.setAttribute('aria-checked', String(state.moveMode === 'free'));
   }
 
   // ---------- LLM 전달 ----------
