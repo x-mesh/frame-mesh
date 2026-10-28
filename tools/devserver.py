@@ -35,6 +35,8 @@ from chat import ChatHub  # noqa: E402  (같은 폴더의 모듈을 경로 추�
 import targets  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+# 확장과 CLI를 같은 태그로 내보내므로 manifest.json의 버전이 서버의 버전이다. 확장은 이 값과 자기 버전을 비교한다.
+VERSION = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8")).get("version", "")
 # 전체 HTML을 포함한 묶음도 받을 수 있게 넉넉히 잡되, 무한 업로드는 막는다.
 MAX_BODY = 20 * 1024 * 1024
 # 요청 번호는 계속 쌓이므로 오래된 것부터 잊는다. 잊은 번호의 답은 어느 대상인지 알 수 없어 거부한다.
@@ -190,7 +192,7 @@ class Router:
         return hub.set_proposal_status(body.get("proposal_id"), body.get("status"), body.get("note", ""))
 
     def status(self, hub, resolved_by):
-        return {**hub.status(), "targets": self.list(), "resolved_by": resolved_by}
+        return {**hub.status(), "version": VERSION, "targets": self.list(), "resolved_by": resolved_by}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -253,7 +255,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _chat_get(self, path, q):
         if path == "/chat/targets":
-            self._json(200, {"ok": True, "frame_mesh": True, "default": ROUTER.default, "targets": ROUTER.list()})
+            self._json(200, {"ok": True, "frame_mesh": True, "version": VERSION, "default": ROUTER.default, "targets": ROUTER.list()})
         elif path == "/chat/status":
             hub, by = ROUTER.resolve(q.get("page"), q.get("target"))
             self._json(200, {"ok": True, **ROUTER.status(hub, by)})
@@ -404,7 +406,8 @@ def join_running_server(base_url, folder):
     """같은 주소에 frame-mesh 서버가 이미 있으면 그 서버의 대상에 folder를 더한다. 합류했으면 True."""
     try:
         with urllib.request.urlopen(f"{base_url}/chat/targets", timeout=JOIN_TIMEOUT_S) as res:
-            if json.loads(res.read() or b"{}").get("frame_mesh") is not True:
+            running = json.loads(res.read() or b"{}")
+            if running.get("frame_mesh") is not True:
                 return False
     except (urllib.error.URLError, OSError, ValueError, AttributeError):
         return False
@@ -422,6 +425,9 @@ def join_running_server(base_url, folder):
     except (urllib.error.URLError, OSError, ValueError):
         return False
     print(f"frame-mesh: added {folder} to the server at {base_url}" if added else f"frame-mesh: {folder} is already served by the server at {base_url}", flush=True)
+    # 합류하면 떠 있는 서버의 코드가 계속 쓰인다. 업데이트한 뒤 서버를 다시 띄우지 않으면 새 동작이 적용되지 않는다.
+    if running.get("version") != VERSION:
+        print(f"frame-mesh: warning: the running server is version {running.get('version') or 'unknown'}, and this command is version {VERSION}. Restart the server to use {VERSION}.", file=sys.stderr)
     return True
 
 

@@ -19,6 +19,7 @@ Commands:
                              reply, propose, and state accept --url URL
   connect                    Send chat requests to this Claude Code session (run with ! in the session)
   whoami                     Show how this Claude Code terminal appears in the chat tab list
+  version                    Show the version of frame-mesh
   help                       Show this help
 
 Examples:
@@ -41,6 +42,9 @@ mcp)
 	;;
 reply | propose | state | connect | whoami)
 	exec python3 "$root/tools/fm_cli.py" "$command" "$@"
+	;;
+version | --version)
+	python3 -c 'import json,sys; print("frame-mesh " + json.load(open(sys.argv[1]))["version"])' "$root/manifest.json"
 	;;
 help | -h | --help)
 	usage

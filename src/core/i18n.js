@@ -250,6 +250,7 @@ const MESSAGES = {
   'chat.flag.pinned': ['connected', '지정'],
   'chat.flag.ambiguous': ['duplicate', '중복'],
   'chat.connected': ['Connected to frame-mesh dev · {target}', 'frame-mesh dev에 연결됨 · {target}'],
+  'chat.versionMismatch': ['Server {server} and extension {client} differ · Update the older one and restart frame-mesh dev', '서버 {server}와 확장 {client} 버전이 다릅니다 · 오래된 쪽을 업데이트하고 frame-mesh dev를 다시 실행하세요'],
   'chat.reason.no_session': ['No agent session in this folder · Run claude in {target}', '이 폴더에 열린 에이전트 세션이 없습니다 · {target}에서 claude를 실행하세요'],
   'chat.reason.no_relay': ['xm is not installed · Tell the session with the frame-mesh MCP to receive frame-mesh chat', 'xm이 없습니다 · frame-mesh MCP가 있는 세션에 "frame-mesh 대화 받아 줘"라고 하세요'],
   'chat.reason.ambiguous': ['Session {name} is open in several terminals (PID {pids}) · Choose a terminal in the list, or run ! frame-mesh connect in the one you want', '세션 {name}이 여러 터미널에 열려 있습니다 (PID {pids}) · 목록에서 터미널을 고르거나, 받을 터미널에서 ! frame-mesh connect를 실행하세요'],

@@ -13,6 +13,8 @@ const MODES = ['relay', 'wait', 'manual'];
 const MANUAL_REASONS = ['no_session', 'no_relay'];
 const SESSION_NAME_LEN = 8;
 const DELIVERY_STATES = ['submitted', 'queued', 'taken', 'error'];
+// 확장 도크는 content script 세계에서 돌아 manifest 버전을 읽을 수 있다. 웹 작업실은 서버가 직접 내주므로 비교할 필요가 없다.
+const CLIENT_VERSION = globalThis.chrome?.runtime?.getManifest?.()?.version || null;
 // 에이전트의 답을 기다리는 전달 상태에만 대기 표시를 붙인다.
 const WAITING_STATES = ['submitted', 'taken'];
 // thinking-orbs는 64px과 20px 프리셋만 있다. 20px은 점이 성겨 잘 보이지 않아, 64px 프리셋으로 그려 ORB_DISPLAY 크기로 줄여 보인다.
@@ -325,7 +327,9 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
       const sessions = st.sessions || [];
       const modeLabel = MODES.includes(st.mode) ? t(`chat.mode.${st.mode}`) : st.mode;
       const hint = st.hint === 'choose' ? t('chat.hint.choose', { n: sessions.filter(isUsable).length }) : '';
-      modeBadge.textContent = [modeLabel, st.target_name, statusTail(st), hint].filter(Boolean).join(' · ');
+      // 서버와 확장의 /chat 규약이 어긋날 수 있다. 업데이트한 뒤 서버를 다시 띄우지 않은 경우가 흔하다.
+      const versionNote = st.version && CLIENT_VERSION && st.version !== CLIENT_VERSION ? t('chat.versionMismatch', { server: st.version, client: CLIENT_VERSION }) : '';
+      modeBadge.textContent = [modeLabel, st.target_name, statusTail(st), hint, versionNote].filter(Boolean).join(' · ');
       modeBadge.title = st.target || '';
       modeBadge.dataset.mode = st.mode;
       renderTargets(st);

@@ -57,7 +57,7 @@ make dev
 3. `chrome://extensions`에서 "개발자 모드"를 켭니다.
 4. "압축해제된 확장 프로그램을 로드합니다"를 누르고 압축을 푼 폴더를 고릅니다.
 
-zip에는 확장만 들어 있습니다. 요소 선택, 편집, 변경 로그, "LLM용 복사"는 다른 파일 없이 동작합니다. "프로젝트에 저장"과 "대화" 탭은 개발 서버가 필요하므로, 이 기능을 쓰려면 저장소를 받아 그 안에서 `make dev`를 실행하거나, 내 프로젝트 폴더에서 `frame-mesh dev`를 실행합니다.
+zip에는 확장만 들어 있습니다. 요소 선택, 편집, 변경 로그, "LLM용 복사"는 다른 파일 없이 동작합니다. "프로젝트에 저장"과 "대화" 탭은 개발 서버가 필요합니다. 이 기능을 쓰려면 `frame-mesh` 명령을 설치하고("에이전트와 대화하기"의 "설정" 참고) 내 프로젝트 폴더에서 `frame-mesh dev`를 실행합니다. 확장과 명령은 같은 버전을 씁니다.
 
 새 버전은 같은 폴더에 압축을 풀어 덮어쓴 뒤, `chrome://extensions`의 frame-mesh 카드에서 새로고침 버튼을 누릅니다.
 
@@ -151,13 +151,22 @@ zip에는 확장만 들어 있습니다. 요소 선택, 편집, 변경 로그, "
 
 ### 설정
 
-`frame-mesh` 명령을 한 번 설치합니다. MCP가 없는 세션도 이 명령으로 답합니다.
+`frame-mesh` 명령을 한 번 설치합니다. MCP가 없는 세션도 이 명령으로 답합니다. `python3`와 `curl`이 필요합니다.
 
 ```bash
-make install    # ~/.local/bin/frame-mesh 를 bin/frame-mesh 에 연결
+curl -fsSL https://raw.githubusercontent.com/x-mesh/frame-mesh/main/install.sh | sh
 ```
 
-`~/.local/bin`이 `PATH`에 없으면 `make install`이 안내 문구를 보여 줍니다. 이때는 `PATH`에 추가합니다.
+설치 스크립트는 최신 릴리스의 `frame-mesh-cli-v<버전>.tar.gz`를 내려받아 릴리스의 `.sha256` 파일로 확인합니다. 그다음 `~/.local/share/frame-mesh/v<버전>`에 풀고 `~/.local/bin/frame-mesh` 링크를 만듭니다. `~/.local/bin`이 `PATH`에 없으면 안내 문구가 나오니 `PATH`에 추가합니다.
+
+- 특정 버전을 설치하려면 `sh` 뒤에 `-s -- --version v<버전>`을 붙입니다.
+- 명령을 지우려면 `sh` 뒤에 `-s -- --uninstall`을 붙입니다.
+- 설치한 버전은 `frame-mesh version`으로 확인합니다.
+- 업데이트하려면 스크립트를 다시 실행합니다. 그다음 실행 중인 `frame-mesh dev`를 멈추고 다시 띄웁니다. 떠 있는 서버는 이전 버전으로 계속 동작합니다.
+
+이 저장소를 고치는 경우에는 대신 `make install`을 씁니다. 저장소의 `bin/frame-mesh`에 `~/.local/bin/frame-mesh` 링크를 겁니다.
+
+대화 탭은 서버와 확장의 버전을 비교해, 다르면 상태줄에 알립니다. `frame-mesh dev`가 다른 버전의 서버에 합류할 때도 경고를 출력합니다.
 
 세션이 MCP 도구로 답하게 하려면 MCP 서버도 한 번 등록합니다. 이 단계는 선택입니다. MCP가 없는 세션도 `xm`이 설치되어 있으면 쓸 수 있습니다.
 
@@ -467,7 +476,7 @@ curl -X POST http://127.0.0.1:4173/handoff \
 src/core/      편집 엔진(선택·이동·크기·이력·측정·diff)과 전달 묶음 생성
 src/panel/     레이어·속성 패널, 확장용 하단 도크, 대화 탭
 src/web/       웹 작업실 호스트(iframe 미리보기, 뷰포트)
-bin/           `frame-mesh` 명령(`dev`, `mcp`, `reply`, `propose`, `state`, `connect`)
+bin/           `frame-mesh` 명령(`dev`, `mcp`, `reply`, `propose`, `state`, `connect`, `whoami`, `version`)
 extension/     확장의 백그라운드, 콘텐츠 스크립트, 사이드 패널
 tools/         개발 서버, 페이지의 프로젝트 찾기, 대화 중계, MCP 서버, 답장 명령, `xm` 래퍼
 tools/demo/    시연 녹화 도구(`make demo`)

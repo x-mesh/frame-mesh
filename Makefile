@@ -9,7 +9,7 @@ JS   := $(wildcard src/*/*.js extension/*.js)
 BIN_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: help dev install uninstall open check test demo package clean
+.PHONY: help dev install uninstall open check test demo package package-cli clean
 
 help: ## 사용할 수 있는 target 목록
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -44,6 +44,20 @@ package: ## 확장 배포용 zip 만들기: dist/frame-mesh-extension-v<버전>.
 	mkdir -p dist && rm -f "$$out" && \
 	zip -qr "$$out" manifest.json _locales extension src/core src/panel -x '*.DS_Store' && \
 	echo "ok  $$out"
+
+# CLI 묶음은 frame-mesh 명령이 쓰는 파일만 담는다: 명령, 서버·대화 도구, 서버가 보여 주는 웹 작업실과 기본 예제,
+# 버전을 읽는 manifest.json. install.sh가 이 묶음과 체크섬을 Release에서 받는다. macOS tar가 확장 속성 파일(._*)을 넣지 않게 COPYFILE_DISABLE을 둔다.
+CLI_FILES := bin/frame-mesh tools/chat.py tools/devserver.py tools/targets.py tools/fm_mcp.py tools/fm_cli.py tools/fm_claude_agents.py \
+	index.html styles.css manifest.json src fixtures/sample-plan.html fixtures/sample-plan.en.html
+package-cli: ## frame-mesh 명령 배포 묶음 만들기: dist/frame-mesh-cli-v<버전>.tar.gz와 .sha256 (Release 첨부용)
+	@version=$$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])"); \
+	name="frame-mesh-cli-v$$version"; out="dist/$$name.tar.gz"; stage=$$(mktemp -d); \
+	mkdir -p dist "$$stage/$$name" && rm -f "$$out" "$$out.sha256" && \
+	for f in $(CLI_FILES); do mkdir -p "$$stage/$$name/$$(dirname $$f)" && cp -R "$$f" "$$stage/$$name/$$f"; done && \
+	find "$$stage" -name '.DS_Store' -delete && \
+	COPYFILE_DISABLE=1 tar -czf "$$out" -C "$$stage" "$$name" && rm -rf "$$stage" && \
+	python3 -c "import hashlib,os,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest() + '  ' + os.path.basename(p))" "$$out" > "$$out.sha256" && \
+	echo "ok  $$out" && echo "ok  $$out.sha256"
 
 # ego-browser 출력을 파이프로 거르면 결과가 사라지는 경우가 있어 그대로 둔다.
 demo: ## 시연 GIF 다시 만들기 (make dev 서버, 확장 로드, ego-browser, ffmpeg 필요)

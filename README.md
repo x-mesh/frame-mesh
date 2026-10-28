@@ -57,7 +57,7 @@ You can install the extension from a release zip or from this repository. Both u
 3. Open `chrome://extensions` and turn on **Developer mode**.
 4. Click **Load unpacked** and select the unzipped folder.
 
-The zip contains only the extension. Selection, edits, the change log, and "Copy for LLM" work without other files. "Save to project" and the "Chat" tab need the development server. For these features, get this repository. Run `make dev` in it, or run `frame-mesh dev` in your project folder.
+The zip contains only the extension. Selection, edits, the change log, and "Copy for LLM" work without other files. "Save to project" and the "Chat" tab need the development server. For these features, install the `frame-mesh` command (see "Set up" under "Chat with an agent") and run `frame-mesh dev` in your project folder. Use the same version for the extension and the command.
 
 To update, unzip the new release into the same folder. Then click the reload button on the frame-mesh card in `chrome://extensions`.
 
@@ -151,13 +151,22 @@ A request goes to the session through `xm relay`. A session with the frame-mesh 
 
 ### Set up
 
-Install the `frame-mesh` command once. Sessions without the MCP also use it to answer.
+Install the `frame-mesh` command once. Sessions without the MCP also use it to answer. The command needs `python3` and `curl`.
 
 ```bash
-make install    # link ~/.local/bin/frame-mesh to bin/frame-mesh
+curl -fsSL https://raw.githubusercontent.com/x-mesh/frame-mesh/main/install.sh | sh
 ```
 
-If `~/.local/bin` is not in your `PATH`, add it. In this case, `make install` shows a notice.
+The script downloads `frame-mesh-cli-v<version>.tar.gz` of the latest release and checks it with the `.sha256` file of the release. It unpacks the bundle to `~/.local/share/frame-mesh/v<version>` and links `~/.local/bin/frame-mesh` to it. If `~/.local/bin` is not in your `PATH`, the script shows a notice. Add the directory to your `PATH`.
+
+- To install a specific version, add `-s -- --version v<version>` after `sh`.
+- To remove the command, add `-s -- --uninstall` after `sh`.
+- To check the installed version, run `frame-mesh version`.
+- To update, run the script again. Then stop a running `frame-mesh dev` and start it again. A running server keeps the old version.
+
+If you work on this repository, run `make install` instead. It links `~/.local/bin/frame-mesh` to `bin/frame-mesh` in the repository.
+
+The chat tab compares the version of the server with the version of the extension. If they differ, the status line says so. If `frame-mesh dev` joins a running server of another version, it prints a warning.
 
 To let sessions answer with MCP tools, register the MCP server once. This step is optional. A session without the MCP still works if `xm` is installed.
 
@@ -467,7 +476,7 @@ For `/chat/*` and `/handoff`, the server accepts browser requests only from its 
 src/core/      Editor engine (selection, move, resize, history, measure, diff) and handoff builder
 src/panel/     Layer and property panels, the dock for the extension, and the chat tab
 src/web/       Web workbench host (iframe preview, viewports)
-bin/           The `frame-mesh` command (`dev`, `mcp`, `reply`, `propose`, `state`, and `connect`)
+bin/           The `frame-mesh` command (`dev`, `mcp`, `reply`, `propose`, `state`, `connect`, `whoami`, and `version`)
 extension/     Extension background script, content script, and side panel
 tools/         Development server, page-to-project lookup, chat relay, MCP server, reply command, and `xm` wrapper
 tools/demo/    Demo recorder (`make demo`)

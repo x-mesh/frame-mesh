@@ -2,7 +2,7 @@
 # git-kit ship과 릴리스 워크플로가 쓰는 보조 명령.
 #   notes <version>  CHANGELOG.md에서 그 버전 구획의 본문을 출력한다 (워크플로의 Release 노트)
 #   watch [tag]      태그 푸시로 시작된 release 워크플로를 찾아 끝날 때까지 기다린다 (ship.watch)
-#   verify [tag]     Release에 첨부된 확장 zip이 내려받아지는지 확인한다 (ship.verify)
+#   verify [tag]     Release에 첨부된 확장 zip과 명령 묶음, 체크섬이 내려받아지는지 확인한다 (ship.verify)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -50,9 +50,11 @@ case "${1:-}" in
   verify)
     tag="${2:-$(current_tag)}"
     repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-    url="https://github.com/$repo/releases/download/$tag/frame-mesh-extension-$tag.zip"
-    curl -fsSIL -o /dev/null "$url"
-    echo "ok  $url"
+    for file in "frame-mesh-extension-$tag.zip" "frame-mesh-cli-$tag.tar.gz" "frame-mesh-cli-$tag.tar.gz.sha256"; do
+      url="https://github.com/$repo/releases/download/$tag/$file"
+      curl -fsSIL -o /dev/null "$url"
+      echo "ok  $url"
+    done
     ;;
   *)
     echo "usage: release.sh notes <version> | watch [tag] | verify [tag]" >&2
