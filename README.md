@@ -81,7 +81,7 @@ The extension requests access to all sites (`<all_urls>`). It injects code only 
 | Click | Selects the visible box under the pointer. It skips transparent link overlays. |
 | Double-click | Selects one level deeper. On a text-only element, it starts a text edit. |
 | ⌘-click (Ctrl-click on Windows) | Selects the deepest element. |
-| Shift-click | Adds the element to the selection, or removes it if it is already selected. Up to 10 elements. Move, resize, and the property panel apply only to the last selected element. The other elements show a dashed outline. The selection is for chat context. |
+| Shift-click | Adds the element to the selection, or removes it if it is already selected. Up to 10 elements. Move, resize, and the property panel apply only to the last selected element. The other elements show a dashed outline. The selection is for chat context. If the page draws the elements again, the selection moves to the new elements. |
 | Right-click | Shows a list of all elements at that point. |
 | Drag | Changes the order or the parent in the same layout flow. If the "Free position" switch is on, it moves the element with a `position: relative` offset. Hold ⌥ (Option) to use the other mode. |
 | Handles on the selection box | Change the width and height. Hold Shift on a corner handle to keep the aspect ratio. |
@@ -123,7 +123,7 @@ Each changed element gets an orange dashed outline and a number. The dock shows 
 - **Show original**: removes the changes for a moment and shows the original page. Press Esc or start an edit to go back.
 - **Reset**: removes all changes at once. The log stays, so redo can restore the changes one by one. To clear the log too, click the gear button in the dock and select "Revert all and clear log".
 
-frame-mesh saves the change log for each page URL and applies it again after a reload. If frame-mesh cannot find an element, the change shows as "Restore failed". For elements that render late, frame-mesh tries again for 15 seconds.
+frame-mesh saves the change log for each page URL and applies it again after a reload. If frame-mesh cannot find an element, the change shows as "Restore failed". frame-mesh tries again each time the page changes its DOM. Some pages draw a list again with new elements, for example with `replaceChildren`. In that case, frame-mesh applies the changes again to the new elements in their original order. Each change records the start of the element text. If the element at the recorded path has other text, frame-mesh uses the one element with the same label and text. If there is no such element, the change shows as "Restore failed" and stays off until the element comes back. The "applied again" notice shows only in the first 15 seconds after a reload.
 
 ## Hand off changes to an agent
 

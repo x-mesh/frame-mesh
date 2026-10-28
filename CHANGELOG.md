@@ -5,7 +5,8 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 ## [Unreleased]
 
 ### Added
-- Shift-click selection. Shift-click adds an element to the selection or removes it, up to 10 elements. Editing still applies to the last selected element only. `getChatContext` and `getState` have the new field `selections`, and the engine has the new method `selectTargets`.
+- Changes survive a page that draws its elements again. When the DOM changes, frame-mesh connects each change whose element is gone to the new element at the same path and applies it again in order. Each change records the start of the element text (`excerpt`, also in the handoff JSON). If the text differs, frame-mesh uses the one element with the same label and text, or marks the change "Restore failed" until the element comes back. Before, frame-mesh tried again only for 15 seconds after a reload.
+- Shift-click selection. Shift-click adds an element to the selection or removes it, up to 10 elements. Editing still applies to the last selected element only. If the page draws part of itself again, for example with `replaceChildren`, the selection moves to the new elements with the same path, label, and start of text. `getChatContext` and `getState` have the new field `selections`, and the engine has the new method `selectTargets`.
 - Selected elements in the chat. The chat tab shows the selected elements above the input. Each sent request keeps them in an "About" row of its bubble. Click a name to select the elements again. The `user` chat event has the new field `selection` with `id`, `label`, `path`, and `excerpt` of each element.
 - A waiting animation in the chat. While a request waits for a reply, the `connecting` animation of thinking-orbs 0.3.1 (MIT) shows before the delivery state. The engine is in `src/panel/thinking-orbs.js`. If the system reduces motion, the animation does not move.
 

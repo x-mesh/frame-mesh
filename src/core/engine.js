@@ -137,6 +137,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     moveMode: 'flow',
     selectedId: null,
     extraIds: [],
+    // 선택한 요소의 {path, label, excerpt}. 페이지가 목록을 다시 그려 요소가 바뀌면 이것으로 새 요소를 찾는다.
+    selRefs: new Map(),
     hoverId: null,
     elementCount: 0,
     nextId: 0,
@@ -339,15 +341,11 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function onDomSettled() {
     state.domTimer = 0;
-    // 추가 선택에서 사라진 요소는 조용히 뺀다. 주 선택이 사라졌을 때만 알리고, 남은 추가 선택이 있으면 마지막 것이 주 선택이 된다.
-    state.extraIds = state.extraIds.filter((id) => byId(id));
-    if (state.selectedId && !byId(state.selectedId)) {
-      state.selectedId = state.extraIds.pop() || null;
-      if (!state.selectedId) onNotice(t('engine.selectionGone'));
-    }
+    // 변경을 먼저 다시 적용한다. 이동한 요소가 제자리로 돌아가야 이동 뒤에 기록한 선택 경로가 맞는다.
+    retryLost();
+    relocateSelection();
     state.elementCount = doc.querySelectorAll('[data-fm-id]').length;
     computeTypeInventory();
-    retryLost();
     updateOverlays();
     scheduleXray();
     renderDiffView();
@@ -388,7 +386,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   // 저장된 연산을 새 DOM의 요소에 연결한다. 경로와 요소 표식이 모두 맞을 때만 성공한다.
   function materialize(op) {
     if (op.kind === 'batch') return op.ops.every((child) => materialize(child));
-    const el = resolveByPath(op.path, op.label);
+    const el = findOpTarget(op);
     if (!el) return false;
     if (op.kind === 'style') {
       op.before = el.style.getPropertyValue(op.prop);
@@ -430,19 +428,32 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     return { restored, lost };
   }
 
-  // 늦게 그려진 요소에 복원 실패로 남은 변경을 다시 연결한다.
+  const targetsLive = (op) => (op.kind === 'batch' ? op.ops.every(targetsLive) : !!byId(op.target));
+
+  // 대상 요소가 문서에 없는 변경을 경로로 새 요소에 다시 연결하고, 적용 중인 변경이면 다시 적용한다.
+  // 복원 직후에는 늦게 그려진 요소를 기다리는 것이고, 그 뒤로는 페이지가 목록 등을 다시 그려(replaceChildren 등)
+  // 요소가 바뀐 경우다. 순서대로 다시 적용해야 이동한 뒤에 기록한 경로도 맞는다.
+  // 알림은 복원 직후에만 띄운다. 화면을 자주 다시 그리는 페이지에서는 갱신 때마다 일어나기 때문이다.
   function retryLost() {
-    if (!state.restoreStartedAt || Date.now() - state.restoreStartedAt > RESTORE_RETRY_MS) return;
     let fixed = 0;
+    let changed = false;
     history.ops.forEach((op, i) => {
-      if (!op.lost || !materialize(op)) return;
+      if (!op.lost && targetsLive(op)) return;
+      if (!materialize(op)) {
+        if (!op.lost) {
+          op.lost = true;
+          changed = true;
+        }
+        return;
+      }
+      if (op.lost) fixed += 1;
       op.lost = false;
-      fixed += 1;
+      changed = true;
       if (i < history.cursor) applyOp(op);
     });
-    if (!fixed) return;
+    if (!changed) return;
     onChange({ type: 'history', kind: 'restore' });
-    onNotice(t('engine.reapplied', { n: fixed }));
+    if (fixed && state.restoreStartedAt && Date.now() - state.restoreStartedAt <= RESTORE_RETRY_MS) onNotice(t('engine.reapplied', { n: fixed }));
   }
 
   function clearHistory() {
@@ -599,6 +610,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   function updateOverlays() {
+    // 이동하면 경로가 바뀌므로, 화면을 그릴 때마다 선택 요소의 위치 정보를 새로 적어 둔다.
+    rememberSelection();
     placeOverlay(ui.select, state.selectedId, true);
     // 추가 선택 요소 위에서는 hover 상자를 숨긴다. 같은 자리에 점선 둘이 겹쳐 보이기 때문이다.
     const hover = state.hoverId && state.hoverId !== state.selectedId && !state.extraIds.includes(state.hoverId) ? state.hoverId : null;
@@ -1441,6 +1454,63 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   // 같은 클래스의 개체가 여럿이면 이름만으로 구분되지 않아 글자 일부를 함께 보여 준다.
   const shortText = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, SELECTION_TEXT_LEN);
 
+  // 지금 문서에 있는 선택 요소의 위치 정보를 갱신한다. 사라진 요소의 정보는 relocateSelection이 쓰도록 남긴다.
+  function rememberSelection() {
+    const ids = selectionIds();
+    [...state.selRefs.keys()].forEach((id) => { if (!ids.includes(id)) state.selRefs.delete(id); });
+    ids.forEach((id) => {
+      const el = byId(id);
+      if (el) state.selRefs.set(id, { path: elementPath(el), label: describe(el), excerpt: shortText(el) });
+    });
+  }
+
+  // 표식과 글자가 같은 요소가 문서에 하나뿐이면 그 요소. 목록이 다시 그려져 순서가 바뀐 요소를 찾을 때 쓴다.
+  function uniqueByText(label, excerpt, taken = new Set()) {
+    const tag = (/^[a-z0-9-]+/i.exec(label || '') || [])[0];
+    if (!tag || !excerpt) return null;
+    const same = [...doc.querySelectorAll(tag)].filter((el) => !taken.has(el) && labelMatches(el, label) && shortText(el) === excerpt);
+    if (same.length !== 1) return null;
+    ensureAncestorsIds(same[0]);
+    return same[0];
+  }
+
+  // 사라진 선택 요소 대신 들어온 요소를 찾는다. 같은 경로에 같은 글자면 그 요소다. 목록 순서가 바뀌었을 수 있으므로,
+  // 아니면 같은 표식과 같은 글자를 가진 요소가 하나뿐일 때 그 요소로 본다. 그것도 없으면 같은 경로의 요소를 쓴다.
+  function relocate(ref, taken) {
+    const atPath = resolveByPath(ref.path, ref.label);
+    const free = atPath && !taken.has(atPath) ? atPath : null;
+    if (free && shortText(free) === ref.excerpt) return free;
+    return uniqueByText(ref.label, ref.excerpt, taken) || free;
+  }
+
+  // 변경을 연결할 요소. 목록에서 항목이 빠지면 경로가 당겨져 같은 경로에 다른 항목이 온다. 기록한 글자가 다르면
+  // 같은 표식과 같은 글자를 가진 요소가 하나뿐일 때만 그 요소로 보고, 아니면 연결하지 않는다. 선택과 달리
+  // 다른 요소에 변경을 적용하면 화면이 틀어지므로 같은 경로로 물러서지 않는다. 글자를 기록하지 않은 이전 이력은 경로만 본다.
+  function findOpTarget(op) {
+    const el = resolveByPath(op.path, op.label);
+    if (op.excerpt == null || (el && shortText(el) === op.excerpt)) return el;
+    return uniqueByText(op.label, op.excerpt);
+  }
+
+  // 페이지가 화면 일부를 다시 그리면(예: replaceChildren) 선택한 요소가 새 요소로 바뀐다. 새 요소를 찾아 선택을 이어 가고,
+  // 찾지 못한 추가 선택은 조용히 뺀다. 선택이 하나도 남지 않을 때만 알린다.
+  function relocateSelection() {
+    const before = selectionIds();
+    if (before.every((id) => byId(id))) return;
+    const taken = new Set(before.map(byId).filter(Boolean));
+    const next = before.map((id) => {
+      if (byId(id)) return id;
+      const ref = state.selRefs.get(id);
+      const el = ref ? relocate(ref, taken) : null;
+      if (!el) return null;
+      taken.add(el);
+      return ensureId(el);
+    }).filter(Boolean);
+    state.selectedId = next.length ? next[next.length - 1] : null;
+    state.extraIds = next.slice(0, -1);
+    if (!state.selectedId) onNotice(t('engine.selectionGone'));
+  }
+
   // 대화 말풍선의 개체 표시에서 선택을 되살린다. id가 바뀌었을 수 있어 경로로도 찾고, 하나도 못 찾으면 선택을 건드리지 않는다.
   function selectTargets(items) {
     const list = (Array.isArray(items) ? items : []).filter(Boolean);
@@ -1678,7 +1748,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function opBase(el) {
     const vp = readViewport();
-    return { target: el.dataset.fmId, label: describe(el), path: elementPath(el), viewport: vp.key, width: vp.width, at: Date.now() };
+    return { target: el.dataset.fmId, label: describe(el), path: elementPath(el), excerpt: shortText(el), viewport: vp.key, width: vp.width, at: Date.now() };
   }
 
   function setStyle(id, prop, value) {
