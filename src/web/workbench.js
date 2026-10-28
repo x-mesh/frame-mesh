@@ -38,6 +38,8 @@ const ui = {
   status: $('status'), statusRight: $('statusRight'), overflowBadge: $('overflowBadge'),
   btnOpen: $('btnOpen'), btnReload: $('btnReload'), fileInput: $('fileInput'),
 };
+// 대화 탭을 처음 열 때 만든다. 엔진 변화에서 선택 줄을 갱신하려고 모듈 범위에 둔다.
+let chat = null;
 const state = { engine: null, sourceName: '', viewportKey: 'desktop', viewportWidth: 1280, scale: 1, frameHeight: MIN_FRAME_HEIGHT, overflowX: 0, renderedAt: null, snapshot: null };
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const timeLabel = (d) => d ? d.toTimeString().slice(0, 8) : '-';
@@ -194,6 +196,7 @@ function onEngineChange(ev) {
   const needTree = ev.type === 'load' || ev.type === 'dom' || (ev.type === 'history' && (ev.kind === 'move' || ev.kind === 'clear'));
   state.snapshot = engine.getState({ tree: needTree });
   panel.update(state.snapshot);
+  chat?.setSelection(state.snapshot.selections || []);
   if (ev.type === 'history') {
     syncFrame();
     persistLog();
@@ -291,7 +294,6 @@ function init() {
       return res.json();
     },
   };
-  let chat = null;
   const showTab = (name) => {
     ['Log', 'Diff', 'Chat'].forEach((t) => $(`tab${t}`).classList.toggle('is-active', t.toLowerCase() === name));
     $('changes').hidden = name !== 'log';
@@ -299,7 +301,10 @@ function init() {
     $('chat').hidden = name !== 'chat';
     document.querySelector('.app').classList.toggle('is-chat', name === 'chat');
     if (name === 'chat') {
-      if (!chat) chat = createChat({ root: $('chat'), transport, bridge, notice: panel.notice });
+      if (!chat) {
+        chat = createChat({ root: $('chat'), transport, bridge, notice: panel.notice });
+        chat.setSelection(state.snapshot?.selections || []);
+      }
       chat.focus();
     }
     syncFrame();

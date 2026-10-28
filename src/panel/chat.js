@@ -1,6 +1,6 @@
 // frame-mesh 대화 화면. 실행 중인 AI 에이전트 세션과 개발 서버를 거쳐 대화하고, 변경 제안을 미리보고 수락한다.
 // transport: { request(method, path, body?) } — 웹 작업실은 fetch, 확장은 사이드 패널이 대신 요청한다.
-// bridge: 엔진 호출(getChatContext, previewProposal, acceptProposal, rejectProposal, getHandoff).
+// bridge: 엔진 호출(getChatContext, selectTargets, previewProposal, acceptProposal, rejectProposal, getHandoff).
 // page: 대상 페이지의 origin을 돌려주는 함수. 서버 하나가 여러 프로젝트를 받으므로 모든 요청에 실어 프로젝트를 고르게 한다. 없으면 서버 기본 대상을 쓴다.
 import { t } from '../core/i18n.js';
 import { resolvePreset, MODE_DRAWS } from './thinking-orbs.js';
@@ -20,6 +20,8 @@ const ORB_PRESET = 64;
 const ORB_DISPLAY = 40;
 // 목록 끝에서 이 거리 안이면 맨 아래를 보고 있다고 본다.
 const STICK_PX = 24;
+// 입력창 위 선택 줄에 이름표로 보여 줄 최대 개수. 넘으면 +n으로 줄인다.
+const PICKED_SHOWN = 4;
 // 움직임 줄이기 설정일 때 보여 줄 시점. ThinkingOrb 컴포넌트와 같은 값이다.
 const ORB_STILL_AT = 0.6;
 // xm이 알려 주는 세션 상태. 모르는 값은 표시하지 않는다.
@@ -182,16 +184,75 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
   const btnApply = el('button', 'btn', t('chat.apply'));
   btnApply.type = 'button';
   btnApply.title = t('chat.applyTitle');
-  form.append(input, el('div', 'chat__actions'));
+  const pickedRow = el('div', 'chat__picked');
+  pickedRow.hidden = true;
+  form.append(pickedRow, input, el('div', 'chat__actions'));
   form.lastChild.append(btnSend, btnApply);
   root.append(head, list, form);
 
   const scrollDown = () => { list.scrollTop = list.scrollHeight; };
 
-  function bubble(role, text, meta) {
+  // 개체 이름표 글자. 이름이 없으면 경로나 ID로 대신한다.
+  const targetName = (item) => item.label || item.path || item.id || '?';
+  // 같은 이름의 개체끼리 구분되도록 글자 일부를 덧붙인다. 전체 글자는 title로 본다.
+  const targetChipText = (item) => (item.excerpt ? `${targetName(item)} · ${item.excerpt}` : targetName(item));
+
+  // 입력창 위 선택 줄. 상태가 바뀔 때마다 불리므로 이름이 같으면 다시 그리지 않는다.
+  let pickedKey = '';
+  function setSelection(items) {
+    const current = Array.isArray(items) ? items : [];
+    const key = JSON.stringify(current.map((s) => [s.id, targetChipText(s)]));
+    if (key === pickedKey) return;
+    pickedKey = key;
+    // 줄이 생기거나 사라지면 목록 높이가 바뀐다. 맨 아래를 보고 있었다면 바뀐 뒤에도 맨 아래를 보여 준다.
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= STICK_PX;
+    pickedRow.textContent = '';
+    pickedRow.hidden = !current.length;
+    if (current.length) {
+      pickedRow.appendChild(el('span', 'chat__picked-label', t('chat.picked')));
+      current.slice(0, PICKED_SHOWN).forEach((s) => {
+        const chip = el('span', 'chat__picked-chip', targetChipText(s));
+        chip.title = targetChipText(s);
+        pickedRow.appendChild(chip);
+      });
+      if (current.length > PICKED_SHOWN) {
+        const more = el('span', 'chat__picked-more', t('chat.pickedMore', { n: current.length - PICKED_SHOWN }));
+        more.title = current.map(targetChipText).join(', ');
+        pickedRow.appendChild(more);
+      }
+    }
+    if (atBottom) scrollDown();
+  }
+
+  // 보낸 요청이 가리킨 개체 줄. 이름표를 누르면 그 개체들을 다시 고른다.
+  function targetsRow(selection) {
+    const row = el('div', 'chat__targets');
+    row.appendChild(el('span', 'chat__targets-label', t('chat.about')));
+    selection.forEach((s) => {
+      const chip = el('button', 'chat__target-chip', targetChipText(s));
+      chip.type = 'button';
+      chip.title = `${targetChipText(s)} · ${t('chat.reselectTitle')}`;
+      chip.addEventListener('click', () => reselect(selection));
+      row.appendChild(chip);
+    });
+    return row;
+  }
+
+  async function reselect(selection) {
+    try {
+      const res = await bridge.call('selectTargets', selection);
+      if (res && res.found === 0) notice(t('chat.targetsGone'));
+      else if (res && res.missing > 0) notice(t('chat.targetsPartial', { n: res.missing }));
+    } catch (err) {
+      notice(err.message);
+    }
+  }
+
+  function bubble(role, text, meta, selection) {
     empty.remove();
     const b = el('div', `chat__msg chat__msg--${role}`);
     b.appendChild(el('div', 'chat__text', text));
+    if (selection && selection.length) b.appendChild(targetsRow(selection));
     if (meta) b.appendChild(meta);
     list.appendChild(b);
     scrollDown();
@@ -416,7 +477,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     if (e.kind === 'user') {
       const meta = el('div', 'chat__meta', t('chat.sending'));
       view.deliveries.set(e.request_id, meta);
-      bubble('user', e.request_kind === 'apply' ? t('chat.applyTag', { text: e.text }) : e.text, meta);
+      bubble('user', e.request_kind === 'apply' ? t('chat.applyTag', { text: e.text }) : e.text, meta, e.selection);
     } else if (e.kind === 'delivery') {
       const meta = view.deliveries.get(e.request_id);
       if (meta) setMeta(meta, e.state === 'error' ? t('chat.deliveryFallback', { label: t('chat.delivery.error'), error: e.error || '' }) : (DELIVERY_STATES.includes(e.state) ? t(`chat.delivery.${e.state}`) : e.state), WAITING_STATES.includes(e.state));
@@ -468,5 +529,6 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
       stopOrbs();
     },
     focus() { input.focus(); },
+    setSelection,
   };
 }

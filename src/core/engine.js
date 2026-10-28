@@ -13,6 +13,11 @@ const AUTOSCROLL_ZONE = 48;
 const AUTOSCROLL_STEP = 14;
 const MIN_SIZE = 8;
 const MAX_TREE_ROWS = 2000;
+// 대화 참조용 다중 선택의 상한(주 선택 포함). 넘으면 가장 오래된 선택부터 버린다.
+const MAX_SELECTION = 10;
+// 선택 이름표에 붙일 개체 글자 길이.
+const SELECTION_TEXT_LEN = 24;
+const CHAT_STYLE_KEYS = ['display', 'width', 'height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-bottom', 'gap', 'font-size', 'font-weight', 'line-height', 'color', 'background-color', 'border-radius'];
 // DOM 변경이 잦은 페이지에서 트리 갱신을 묶어 보내는 대기 시간
 const DOM_SETTLE_MS = 300;
 // 새로고침 뒤 늦게 그려지는 요소를 기다려 복원을 다시 시도하는 시간
@@ -45,6 +50,8 @@ const OVERLAY_CSS = `
 .ov[hidden] { display: none; }
 .ov--hover { outline: 1px dashed var(--fm-hover); outline-offset: -1px; background: rgba(124, 58, 237, 0.05); }
 .ov--select { outline: 2px solid var(--fm-accent); outline-offset: -1px; background: rgba(13, 153, 255, 0.08); }
+.ov--extra { outline-style: dashed; background: none; }
+.ov--extra .tag { opacity: 0.85; }
 .focus { position: absolute; left: 0; top: 0; pointer-events: none; }
 .focus[hidden] { display: none; }
 .dim { position: absolute; left: 0; top: 0; background: rgba(15, 15, 25, 0.45); }
@@ -129,6 +136,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     mode: initialMode,
     moveMode: 'flow',
     selectedId: null,
+    extraIds: [],
     hoverId: null,
     elementCount: 0,
     nextId: 0,
@@ -198,11 +206,12 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   const isUnit = (el) => el === doc.body || UNIT_TAGS.has(el.tagName.toLowerCase()) || hasVisibleBox(el);
 
   // 포인터 아래 가장 깊은 요소에서 출발해 선택된 요소나 눈에 보이는 상자를 만날 때까지 올라간다.
-  function grabUnit(hit) {
+  // withExtras: Shift+클릭으로 추가 선택된 요소도 멈춤 지점으로 본다. 그래야 글자 요소를 추가 선택한 뒤 같은 곳을 Shift+클릭해 뺄 수 있다.
+  function grabUnit(hit, withExtras = false) {
     let cur = hit;
     let last = hit;
     while (cur && cur.dataset && cur.dataset.fmId) {
-      if (cur.dataset.fmId === state.selectedId || isUnit(cur)) return cur;
+      if (cur.dataset.fmId === state.selectedId || isUnit(cur) || (withExtras && state.extraIds.includes(cur.dataset.fmId))) return cur;
       last = cur;
       cur = cur.parentElement;
     }
@@ -330,9 +339,11 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function onDomSettled() {
     state.domTimer = 0;
+    // 추가 선택에서 사라진 요소는 조용히 뺀다. 주 선택이 사라졌을 때만 알리고, 남은 추가 선택이 있으면 마지막 것이 주 선택이 된다.
+    state.extraIds = state.extraIds.filter((id) => byId(id));
     if (state.selectedId && !byId(state.selectedId)) {
-      state.selectedId = null;
-      onNotice(t('engine.selectionGone'));
+      state.selectedId = state.extraIds.pop() || null;
+      if (!state.selectedId) onNotice(t('engine.selectionGone'));
     }
     state.elementCount = doc.querySelectorAll('[data-fm-id]').length;
     computeTypeInventory();
@@ -491,6 +502,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     ui.container = box('ov--container', [span('tag')]);
     ui.drop = box('ov--drop', []);
     ui.hover = box('ov--hover', [span('tag')]);
+    // 추가 선택 상자는 주 선택 상자보다 먼저 만들어 겹칠 때 주 선택이 위에 그려진다.
+    ui.extras = Array.from({ length: MAX_SELECTION - 1 }, () => box('ov--select ov--extra', [span('tag')]));
     ui.select = box('ov--select', [span('tag'), span('size'), span('handle', { 'data-dir': 'e' }), span('handle', { 'data-dir': 's' }), span('handle', { 'data-dir': 'se' })]);
     ui.ghost = box('ov--ghost', [span('tag')]);
     ui.picker = doc.createElement('div');
@@ -587,8 +600,10 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function updateOverlays() {
     placeOverlay(ui.select, state.selectedId, true);
-    const hover = state.hoverId && state.hoverId !== state.selectedId ? state.hoverId : null;
+    // 추가 선택 요소 위에서는 hover 상자를 숨긴다. 같은 자리에 점선 둘이 겹쳐 보이기 때문이다.
+    const hover = state.hoverId && state.hoverId !== state.selectedId && !state.extraIds.includes(state.hoverId) ? state.hoverId : null;
     placeOverlay(ui.hover, hover, false);
+    ui.extras.forEach((box, i) => placeOverlay(box, state.extraIds[i] || null, false));
     renderMarks();
     renderBoxModel(byId(state.selectedId));
     renderFocus(byId(state.selectedId));
@@ -853,26 +868,30 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     return { ok: true };
   }
 
+  function chatSelection(el) {
+    const cs = win.getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return {
+      label: describe(el),
+      path: elementPath(el),
+      size: `${Math.round(r.width)}x${Math.round(r.height)}`,
+      text: isTextLeaf(el) ? el.textContent.trim().slice(0, 200) : undefined,
+      parent: el.parentElement && el.parentElement !== doc.documentElement ? { label: describe(el.parentElement), path: elementPath(el.parentElement) } : null,
+      styles: Object.fromEntries(CHAT_STYLE_KEYS.map((k) => [k, cs.getPropertyValue(k)])),
+    };
+  }
+
   // 대화 요청에 함께 보낼 페이지 문맥. 페이지 글은 자료로만 쓰이도록 짧게 줄인다.
   function getChatContext() {
     const el = byId(state.selectedId);
-    let selection = null;
-    if (el) {
-      const cs = win.getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      const keys = ['display', 'width', 'height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-bottom', 'gap', 'font-size', 'font-weight', 'line-height', 'color', 'background-color', 'border-radius'];
-      selection = {
-        label: describe(el),
-        path: elementPath(el),
-        size: `${Math.round(r.width)}x${Math.round(r.height)}`,
-        text: isTextLeaf(el) ? el.textContent.trim().slice(0, 200) : undefined,
-        parent: el.parentElement && el.parentElement !== doc.documentElement ? { label: describe(el.parentElement), path: elementPath(el.parentElement) } : null,
-        styles: Object.fromEntries(keys.map((k) => [k, cs.getPropertyValue(k)])),
-      };
-    }
+    const selection = el ? chatSelection(el) : null;
     return {
       url: source,
       selection,
+      selections: selectedElements().map((item) => {
+        const { parent, ...fields } = chatSelection(item);
+        return { id: item.dataset.fmId, excerpt: shortText(item), ...fields };
+      }),
       applied: appliedCount(),
       diff: getDiff().map((d) => ({ label: d.label, path: d.currentPath || d.path, lines: d.lines.map((l) => `${l.sign} ${l.text}`) })),
     };
@@ -1280,6 +1299,12 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
         return;
       }
       const hit = targetElement(e);
+      if (e.shiftKey) {
+        // 빈 곳이나 문서 바탕(body)에서 Shift+클릭은 놓친 클릭일 가능성이 커서 선택을 건드리지 않는다.
+        const target = hit && (deepSelect(e) ? hit : grabUnit(hit, true));
+        if (target && target !== doc.body) toggleSelection(target.dataset.fmId);
+        return;
+      }
       if (!hit) {
         select(null);
         return;
@@ -1391,11 +1416,56 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   // ---------- 선택 ----------
-  function select(id) {
-    const el = byId(id);
-    state.selectedId = el ? id : null;
+  // 선택 순서(오래된 것부터). 주 선택이 가장 최근에 고른 요소로 마지막에 온다.
+  const selectionIds = () => (state.selectedId ? [...state.extraIds, state.selectedId] : []);
+  const selectedElements = () => selectionIds().map(byId).filter(Boolean);
+
+  // ids의 마지막이 주 선택이고 나머지는 추가 선택이다. 문서에 없는 ID와 중복은 버린다.
+  function setSelection(ids) {
+    const live = [...new Set(ids)].filter((id) => byId(id)).slice(-MAX_SELECTION);
+    state.selectedId = live.length ? live[live.length - 1] : null;
+    state.extraIds = live.slice(0, -1);
     updateOverlays();
     onChange({ type: 'select' });
+  }
+
+  function select(id) {
+    setSelection(id ? [id] : []);
+  }
+
+  function toggleSelection(id) {
+    const ids = selectionIds();
+    setSelection(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+
+  // 같은 클래스의 개체가 여럿이면 이름만으로 구분되지 않아 글자 일부를 함께 보여 준다.
+  const shortText = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, SELECTION_TEXT_LEN);
+
+  // 대화 말풍선의 개체 표시에서 선택을 되살린다. id가 바뀌었을 수 있어 경로로도 찾고, 하나도 못 찾으면 선택을 건드리지 않는다.
+  function selectTargets(items) {
+    const list = (Array.isArray(items) ? items : []).filter(Boolean);
+    // ID로 찾은 요소를 먼저 확정한다. 요소가 지워지면 형제의 nth-of-type 경로가 앞당겨져,
+    // 경로로 찾은 요소가 다른 항목의 요소일 수 있기 때문이다. 그런 요소는 찾지 못한 것으로 센다.
+    const byItem = list.map((item) => byId(item.id));
+    const claimed = new Set(byItem.filter(Boolean));
+    const ids = [];
+    let missing = 0;
+    list.forEach((item, i) => {
+      let el = byItem[i];
+      if (!el) {
+        el = resolveByPath(item.path, item.label);
+        if (el && claimed.has(el)) el = null;
+        if (el) claimed.add(el);
+      }
+      if (!el) {
+        missing += 1;
+        return;
+      }
+      ids.push(el.dataset.fmId);
+    });
+    const found = new Set(ids).size;
+    if (found) setSelection(ids);
+    return { ok: found > 0, found, missing };
   }
 
   function selectParent() {
@@ -1435,6 +1505,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       endResize();
       state.hoverId = null;
       state.selectedId = null;
+      state.extraIds = [];
       updateOverlays();
     }
     onChange({ type: 'mode' });
@@ -1721,6 +1792,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     e.stopPropagation();
     releasePageFocus();
     state.suppressClick = false;
+    // Shift+클릭은 선택을 더하고 빼는 동작이라, 이어지는 끌기가 선택을 단일로 되돌리거나 요소를 옮기지 않게 드래그를 시작하지 않는다.
+    if (e.shiftKey) return;
     const hit = targetElement(e);
     if (!hit || hit === doc.body) return;
     const el = deepSelect(e) ? hit : grabUnit(hit);
@@ -2072,7 +2145,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function holdInteract(on) {
     if (on) {
       if (state.hold || state.mode !== 'select') return;
-      state.hold = { selectedId: state.selectedId, measure: state.measure, xray: state.xray, focus: state.focus, diffView: state.diffView };
+      state.hold = { selectedId: state.selectedId, extraIds: state.extraIds, measure: state.measure, xray: state.xray, focus: state.focus, diffView: state.diffView };
       setMode('interact');
       return;
     }
@@ -2084,7 +2157,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     if (h.xray) setXray(true);
     if (h.focus) setFocus(true);
     if (h.diffView) setDiffView(true);
-    if (h.selectedId && byId(h.selectedId)) select(h.selectedId);
+    if (h.selectedId && byId(h.selectedId)) setSelection([...h.extraIds, h.selectedId]);
   }
 
   function onKeyup(e) {
@@ -2271,6 +2344,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       xray: state.xray,
       focus: state.focus,
       selection: el ? selectionInfo(el) : null,
+      selections: selectedElements().map((item) => ({ id: item.dataset.fmId, label: describe(item), path: elementPath(item), excerpt: shortText(item) })),
       changes: history.ops.map((op, i) => ({ n: i + 1, at: op.at, label: op.label, desc: describeOp(op), vp: labelViewport(op), undone: i >= history.cursor, restored: !!op.restored, lost: !!op.lost })),
       cursor: history.cursor,
       total: history.ops.length,
@@ -2327,7 +2401,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     init, destroy, select, selectParent, setMode, holdInteract, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
     undo: () => { ensureLive(); history.undo(); }, redo: () => { ensureLive(); history.redo(); }, goto: (n) => { ensureLive(); history.goto(n); },
     setPeek, getDiff, setDiffView, editText,
-    previewProposal, acceptProposal, rejectProposal, getChatContext,
+    previewProposal, acceptProposal, rejectProposal, getChatContext, selectTargets,
     refresh: updateOverlays, getState, getHandoff, exportOps, restoreOps, clearHistory,
     get selectedId() { return state.selectedId; },
   };

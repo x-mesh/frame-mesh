@@ -190,9 +190,20 @@ button { cursor: pointer; }
 .chat__ops { margin: 0 0 6px; padding-left: 16px; font-family: var(--mono); font-size: 11px; }
 .chat__proposal-actions { display: flex; align-items: center; gap: 6px; }
 .chat__proposal-state { font-size: 11px; color: var(--ink-2); }
-.chat__form { display: flex; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--line); flex: none; }
+.chat__form { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--line); flex: none; }
 .chat__input { flex: 1; resize: none; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
 .chat__actions { display: flex; flex-direction: column; gap: 4px; }
+/* 입력창 위 선택 줄. 줄바꿈되는 폼에서 한 줄을 다 차지한다. */
+.chat__picked { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-2); }
+.chat__picked[hidden] { display: none; }
+.chat__picked-chip { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 7px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); font: 10px/1.6 var(--mono); }
+.chat__picked-more { color: var(--ink-3); font: 10px var(--mono); }
+/* 보낸 요청 말풍선의 대상 줄. 말풍선이 어두우므로 이름표는 밝은 계열이다. */
+.chat__targets { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; font-size: 10px; }
+.chat__targets-label { opacity: 0.7; }
+.chat__target-chip { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 7px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 10px; background: rgba(255, 255, 255, 0.14); color: #fff; font: 10px/1.6 var(--mono); cursor: pointer; }
+.chat__target-chip:hover { background: rgba(255, 255, 255, 0.28); }
+.chat__target-chip:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .chat__proposal-state.is-error { color: #b42318; }
 .chat__proposal-reason { margin: 0 0 6px; color: var(--ink-2); line-height: 1.5; }
 .chat__proposal-reason.is-missing { color: var(--ink-3); font-style: italic; }

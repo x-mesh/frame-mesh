@@ -5,6 +5,8 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 ## [Unreleased]
 
 ### Added
+- Shift-click selection. Shift-click adds an element to the selection or removes it, up to 10 elements. Editing still applies to the last selected element only. `getChatContext` and `getState` have the new field `selections`, and the engine has the new method `selectTargets`.
+- Selected elements in the chat. The chat tab shows the selected elements above the input. Each sent request keeps them in an "About" row of its bubble. Click a name to select the elements again. The `user` chat event has the new field `selection` with `id`, `label`, `path`, and `excerpt` of each element.
 - A waiting animation in the chat. While a request waits for a reply, the `connecting` animation of thinking-orbs 0.3.1 (MIT) shows before the delivery state. The engine is in `src/panel/thinking-orbs.js`. If the system reduces motion, the animation does not move.
 
 - The `frame-mesh` command with `frame-mesh dev` (starts the server for the current project) and `frame-mesh mcp`. `make install` and `make uninstall` add and remove the link in `~/.local/bin`.

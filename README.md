@@ -81,6 +81,7 @@ The extension requests access to all sites (`<all_urls>`). It injects code only 
 | Click | Selects the visible box under the pointer. It skips transparent link overlays. |
 | Double-click | Selects one level deeper. On a text-only element, it starts a text edit. |
 | ⌘-click (Ctrl-click on Windows) | Selects the deepest element. |
+| Shift-click | Adds the element to the selection, or removes it if it is already selected. Up to 10 elements. Move, resize, and the property panel apply only to the last selected element. The other elements show a dashed outline. The selection is for chat context. |
 | Right-click | Shows a list of all elements at that point. |
 | Drag | Changes the order or the parent in the same layout flow. If the "Free position" switch is on, it moves the element with a `position: relative` offset. Hold ⌥ (Option) to use the other mode. |
 | Handles on the selection box | Change the width and height. Hold Shift on a corner handle to keep the aspect ratio. |
@@ -142,7 +143,9 @@ The server also creates `.frame-mesh/.gitignore`, so Git does not track the hand
 
 ## Chat with an agent
 
-The "Chat" tab sends requests to an AI coding agent session that runs in the target project folder. The tab is in the dock, or in the bottom panel of the web workbench. frame-mesh does not start an agent. Each request includes the selected element, its main styles, and the current diff.
+The "Chat" tab sends requests to an AI coding agent session that runs in the target project folder. The tab is in the dock, or in the bottom panel of the web workbench. frame-mesh does not start an agent. Each request includes the selected elements, their main styles, and the current diff.
+
+Above the input, the chat tab shows the selected elements, as in `Selected li.check-item · Scope approval`. Each name shows the start of the element text, so elements with the same class are different. After you send a request, its bubble keeps these elements in an "About" row. The row stays after the reply. Click a name in the row to select the elements on the page again. frame-mesh finds each element by its element ID first, then by its path. If an element is not on the page, a notice shows the number of missing elements.
 
 A request goes to the session through `xm relay`. A session with the frame-mesh MCP answers with the MCP tools. A session without it answers with `frame-mesh` shell commands. One server can serve more than one project. See "Several projects on one server".
 

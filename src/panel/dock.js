@@ -194,7 +194,10 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     chatView.hidden = name !== 'chat';
     dock.classList.toggle('is-chat', name === 'chat');
     if (name === 'chat') {
-      if (!chat && chatTransport) chat = createChat({ root: chatView, transport: chatTransport, bridge, notice: (m) => panel.notice(m), page: () => win.location.origin });
+      if (!chat && chatTransport) {
+        chat = createChat({ root: chatView, transport: chatTransport, bridge, notice: (m) => panel.notice(m), page: () => win.location.origin });
+        chat.setSelection(lastState?.selections || []);
+      }
       if (chat) chat.focus();
     }
   };
@@ -309,6 +312,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     lastState = state;
     dock.classList.toggle('is-editing', state.mode === 'select');
     renderApplied();
+    chat?.setSelection(state.selections || []);
     panel.update({ ...state, tree: undefined });
     status.textContent = t('dock.status', { source: state.source, n: state.elementCount });
     status.title = t('dock.statusTitle');

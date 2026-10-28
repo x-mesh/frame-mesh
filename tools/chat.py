@@ -47,6 +47,9 @@ import uuid
 
 # 페이지에서 온 자료는 LLM에 지시로 읽힐 수 있어 길이를 제한해 보낸다.
 PAGE_DATA_LIMIT = 6000
+# 사용자 말풍선에 남기는 대상 목록의 한도. 엔진의 MAX_SELECTION과 같은 값이며, 페이지에서 온 값이라 서버도 다시 자른다.
+SELECTION_KEEP = 10
+SELECTION_TEXT_LEN = 200
 RELAY_TIMEOUT_S = 15
 # 상태 조회가 10초마다 오고 sessions 호출은 느리므로, 발견 세션은 잠시 재사용한다.
 SESSIONS_CACHE_S = 5
@@ -100,6 +103,28 @@ def read_proc_info(pids):
             started = None
         info[int(parts[0])] = {"tty": None if parts[1].strip("?") == "" else parts[1], "started_at": started}
     return info
+
+
+def selection_summary(context):
+    """context에서 이번 요청이 가리킨 개체의 {id, label, path, excerpt} 목록을 뽑는다. 말풍선에 남겨 다시 선택할 때 쓴다."""
+    if not isinstance(context, dict):
+        return []
+    items = context.get("selections")
+    has_ids = isinstance(items, list)
+    if not has_ids:
+        single = context.get("selection")
+        items = [single] if isinstance(single, dict) else []
+    picked = []
+    for item in items[:SELECTION_KEEP]:
+        if not isinstance(item, dict):
+            continue
+        entry = {"id": item.get("id") if has_ids and isinstance(item.get("id"), str) else None}
+        for key in ("label", "path", "excerpt"):
+            value = item.get(key)
+            entry[key] = value[:SELECTION_TEXT_LEN] if isinstance(value, str) else None
+        picked.append(entry)
+    return picked
+
 
 class ChatHub:
     def __init__(self, root, target=None, base_url=DEFAULT_URL):
@@ -465,7 +490,7 @@ class ChatHub:
         req = {"request_id": uuid.uuid4().hex[:8], "text": text, "context": context or {}, "kind": kind, "at": time.time()}
         if context:
             self.page_state = context
-        self._emit("user", request_id=req["request_id"], text=text, request_kind=kind)
+        self._emit("user", request_id=req["request_id"], text=text, request_kind=kind, selection=selection_summary(context))
         mode = self.mode()
         if mode == "relay":
             result = self._relay(req)
