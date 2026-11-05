@@ -1,6 +1,6 @@
 // frame-mesh 대화 화면. 실행 중인 AI 에이전트 세션과 개발 서버를 거쳐 대화하고, 변경 제안을 미리보고 수락한다.
 // transport: { request(method, path, body?) } — 웹 작업실은 fetch, 확장은 사이드 패널이 대신 요청한다.
-// bridge: 엔진 호출(getChatContext, selectTargets, previewProposal, acceptProposal, rejectProposal, getHandoff).
+// bridge: 엔진 호출(getChatContext, getChatContent, selectTargets, previewProposal, acceptProposal, rejectProposal, getHandoff).
 // page: 대상 페이지의 origin을 돌려주는 함수. 서버 하나가 여러 프로젝트를 받으므로 모든 요청에 실어 프로젝트를 고르게 한다. 없으면 서버 기본 대상을 쓴다.
 import { t } from '../core/i18n.js';
 import { resolvePreset, MODE_DRAWS } from './thinking-orbs.js';
@@ -420,13 +420,16 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
   // ---------- 보내기 ----------
   async function send(text, kind = 'chat') {
     let context = {};
+    let content = null;
     try {
       context = await bridge.call('getChatContext');
+      content = await bridge.call('getChatContent');
     } catch (_) {
       // 문맥 없이도 보낼 수 있다. 엔진이 아직 준비되지 않은 경우다.
     }
     try {
-      const res = await request('POST', '/chat/send', { text, context, kind });
+      const res = await request('POST', '/chat/send', { text, context, content, kind });
+      if (res.ok && res.content_error) notice(t('chat.contentFailed', { msg: res.content_error }));
       if (!res.ok) throw new Error(res.error || t('chat.sendFailedBody'));
       if (res.mode === 'manual') notice(t('chat.queuedNotice'));
       refreshStatus();

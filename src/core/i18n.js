@@ -250,6 +250,7 @@ const MESSAGES = {
   'chat.flag.pinned': ['connected', '지정'],
   'chat.flag.ambiguous': ['duplicate', '중복'],
   'chat.connected': ['Connected to frame-mesh dev · {target}', 'frame-mesh dev에 연결됨 · {target}'],
+  'chat.contentFailed': ['Sent without the content file: {msg}', '내용 파일 없이 보냈습니다: {msg}'],
   'chat.build': ['v{version} · build {id}', 'v{version} · 빌드 {id}'],
   'chat.clientStale': ['Screen code changed ({files}) · Reload this page', '화면 코드가 바뀌었습니다({files}) · 페이지를 새로고침하세요'],
   'chat.serverStale': ['Server code changed ({files}) · Restart frame-mesh dev', '서버 코드가 바뀌었습니다({files}) · frame-mesh dev를 다시 실행하세요'],

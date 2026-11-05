@@ -56,6 +56,14 @@ export function cleanHtml(doc) {
   return `${doctype}${clone.outerHTML}\n`;
 }
 
+// 에이전트에 넘기는 요소 HTML. 스크립트는 빼고, 비밀번호 칸에 값이 박혀 있으면 지운다.
+export function cleanElementHtml(el) {
+  const clone = stripMarks(el.cloneNode(true));
+  clone.querySelectorAll('script').forEach((n) => n.remove());
+  clone.querySelectorAll('input[type=password][value]').forEach((n) => n.removeAttribute('value'));
+  return clone.outerHTML;
+}
+
 export function cleanOuterHtml(el) {
   const html = stripMarks(el.cloneNode(true)).outerHTML;
   return html.length > SNIPPET_LIMIT ? `${html.slice(0, SNIPPET_LIMIT)}\n${t('handoff.omitted', { n: html.length - SNIPPET_LIMIT })}` : html;

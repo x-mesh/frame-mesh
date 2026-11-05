@@ -31,7 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from chat import ChatHub  # noqa: E402  (같은 폴더의 모듈을 경로 추가 뒤에 불러온다)
+from chat import ChatHub, ensure_handoff_dir  # noqa: E402  (같은 폴더의 모듈을 경로 추가 뒤에 불러온다)
 import targets  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -222,8 +222,8 @@ class Router:
             while len(table) > ID_KEEP:
                 del table[next(iter(table))]
 
-    def send(self, hub, text, context, kind):
-        result = hub.send(text, context, kind)
+    def send(self, hub, text, context, kind, content=None):
+        result = hub.send(text, context, kind, content)
         self._remember(self.requests, result.get("request_id"), hub)
         return result
 
@@ -370,7 +370,7 @@ class Handler(SimpleHTTPRequestHandler):
             return {"ok": True, **ROUTER.status(hub, "chosen")}
         if path == "/chat/send":
             hub, _ = ROUTER.resolve(page, target)
-            return ROUTER.send(hub, body.get("text"), body.get("context"), body.get("kind", "chat"))
+            return ROUTER.send(hub, body.get("text"), body.get("context"), body.get("kind", "chat"), body.get("content"))
         if path == "/chat/register":
             # 세션이 알리는 것만으로는 대상을 늘리지 않는다. 맞는 대상이 없으면 기본 hub가 in_target: false로 답한다.
             hub, _ = ROUTER.resolve(cwd=body.get("cwd"))
@@ -426,13 +426,7 @@ class Handler(SimpleHTTPRequestHandler):
         source = (data or {}).get("source") or payload.get("source") or "page"
         slug = re.sub(r"[^A-Za-z0-9._-]+", "-", re.sub(r"^https?://", "", str(source))).strip("-")[:60] or "page"
         stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
-        handoff_dir.mkdir(parents=True, exist_ok=True)
-        # 사용자의 저장소 .gitignore를 건드리지 않고도 전달 묶음이 커밋되지 않게 한다.
-        try:
-            with open(handoff_dir.parent / ".gitignore", "x", encoding="utf-8") as f:
-                f.write("*\n")
-        except FileExistsError:
-            pass
+        ensure_handoff_dir(handoff_dir)
         md_path = handoff_dir / f"{stamp}-{slug}.md"
         md_path.write_text(markdown, encoding="utf-8")
         files = [md_path]
