@@ -17,6 +17,8 @@ const MAX_TREE_ROWS = 2000;
 const MAX_SELECTION = 10;
 // 선택 이름표에 붙일 개체 글자 길이.
 const SELECTION_TEXT_LEN = 24;
+// 대화 요청에 함께 보내는 요소 글의 길이. 요청 전체가 서버의 PAGE_DATA_LIMIT 안에 들어가도록 짧게 둔다.
+const CHAT_TEXT_LEN = 400;
 const CHAT_STYLE_KEYS = ['display', 'width', 'height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-bottom', 'gap', 'font-size', 'font-weight', 'line-height', 'color', 'background-color', 'border-radius'];
 // DOM 변경이 잦은 페이지에서 트리 갱신을 묶어 보내는 대기 시간
 const DOM_SETTLE_MS = 300;
@@ -888,7 +890,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       label: describe(el),
       path: elementPath(el),
       size: `${Math.round(r.width)}x${Math.round(r.height)}`,
-      text: isTextLeaf(el) ? el.textContent.trim().slice(0, 200) : undefined,
+      // textContent는 숨긴 화면(display: none)의 글까지 담아, 탭을 DOM에 남겨 두는 페이지에서 엉뚱한 화면을 설명하게 된다.
+      text: (el.innerText ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, CHAT_TEXT_LEN) || undefined,
       parent: el.parentElement && el.parentElement !== doc.documentElement ? { label: describe(el.parentElement), path: elementPath(el.parentElement) } : null,
       styles: Object.fromEntries(CHAT_STYLE_KEYS.map((k) => [k, cs.getPropertyValue(k)])),
     };
