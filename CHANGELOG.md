@@ -5,6 +5,7 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 ## [Unreleased]
 
 ### Added
+- A content file with each chat request. When elements are selected, frame-mesh saves their full visible text (`innerText`, with its line structure) and their HTML (without frame-mesh marks, scripts, and password values) to `.frame-mesh/handoffs/<time>-<request>-context.md`, up to 200,000 characters. The request message gives the path and tells the agent to read the file when the request is about the content or behavior of the elements. The message itself still has only the layout summary. frame-mesh keeps the 20 newest content files for each target. `POST /chat/send` takes the new field `content`, and its response has the new field `content_error`. The engine has the new method `getChatContent`.
 - Child elements in the layout summary. The `children` field of each selected element lists up to 10 child elements with their size and `display`. Hidden children show as `(hidden)`.
 
 ### Fixed
