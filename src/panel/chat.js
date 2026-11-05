@@ -15,6 +15,32 @@ const SESSION_NAME_LEN = 8;
 const DELIVERY_STATES = ['submitted', 'queued', 'taken', 'error'];
 // 확장 도크는 content script 세계에서 돌아 manifest 버전을 읽을 수 있다. 웹 작업실은 서버가 직접 내주므로 비교할 필요가 없다.
 const CLIENT_VERSION = globalThis.chrome?.runtime?.getManifest?.()?.version || null;
+// 빌드 ID에 보여 줄 해시 길이.
+const BUILD_ID_LEN = 7;
+
+// 서버(tools/devserver.py의 fnv1a)와 같은 해시. 비교만 하므로 보안 해시가 아니어도 된다.
+function fnv1a(bytes) {
+  let h = 0x811c9dc5;
+  for (const b of bytes) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+
+const combineBuild = (files) => fnv1a(new TextEncoder().encode(Object.keys(files).sort().map((p) => `${p}:${files[p]}`).join('\n')));
+
+// 화면 코드를 불러온 직후의 파일 내용을 해시해 둔다. 서버가 알리는 지금 디스크의 해시와 다르면 새로고침이 필요하다.
+async function loadedFiles(paths) {
+  const url = (p) => (CLIENT_VERSION ? chrome.runtime.getURL(p) : `/${p}`);
+  const out = {};
+  await Promise.all(paths.map(async (p) => {
+    try {
+      const res = await fetch(url(p), { cache: 'no-store' });
+      out[p] = res.ok ? fnv1a(new Uint8Array(await res.arrayBuffer())) : null;
+    } catch (_) {
+      out[p] = null;
+    }
+  }));
+  return out;
+}
 // 에이전트의 답을 기다리는 전달 상태에만 대기 표시를 붙인다.
 const WAITING_STATES = ['submitted', 'taken'];
 // thinking-orbs는 64px과 20px 프리셋만 있다. 20px은 점이 성겨 잘 보이지 않아, 64px 프리셋으로 그려 ORB_DISPLAY 크기로 줄여 보인다.
@@ -129,7 +155,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     return n;
   };
   // epoch: 대상이 바뀔 때마다 올라간다. 이전 대상으로 보낸 이벤트 조회가 늦게 돌아와도 버리기 위해서다.
-  const view = { since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
+  const view = { loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
 
   // 전달 상태 문구를 바꾼다. 응답 대기 상태면 문구 앞에 대기 표시를 두고, 다른 상태로 바뀌면 그리기를 멈춘다.
   function setMeta(meta, text, waiting = false) {
@@ -261,6 +287,27 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     return b;
   }
 
+  // 답변에 나온 이미지 경로를 서버에서 받아 말풍선 아래에 붙인다. 누르면 원래 크기로 펼친다.
+  function attachImages(b, paths) {
+    const wrap = el('div', 'chat__images');
+    paths.forEach((path) => {
+      const img = el('img', 'chat__image');
+      img.alt = path.split('/').pop();
+      img.title = path;
+      img.addEventListener('click', () => img.classList.toggle('is-expanded'));
+      wrap.appendChild(img);
+      request('GET', `/chat/image?path=${encodeURIComponent(path)}`).then((res) => {
+        if (!res.ok) throw new Error(res.error || t('chat.unknownError'));
+        const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= STICK_PX;
+        img.addEventListener('load', () => { if (atBottom) scrollDown(); }, { once: true });
+        img.src = res.data_url;
+      }).catch((err) => {
+        img.replaceWith(el('div', 'chat__image-error', t('chat.imageFailed', { path, msg: err.message })));
+      });
+    });
+    b.appendChild(wrap);
+  }
+
   // ---------- 상태 ----------
   function statusTail(st) {
     if (st.mode === 'relay' || st.mode === 'wait') {
@@ -318,6 +365,18 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     else sessionSelect.value = st.session_id || cur || (sessions.find(isUsable) || sessions[0]).session_id;
   }
 
+  async function buildNote(st, versionDiffers) {
+    if (!st.build) return '';
+    view.loaded ??= loadedFiles(Object.keys(st.build.files));
+    const loaded = await view.loaded;
+    const changed = Object.keys(st.build.files).filter((p) => loaded[p] !== st.build.files[p]).map((p) => p.split('/').pop());
+    const parts = [t('chat.build', { version: CLIENT_VERSION || st.version, id: combineBuild(loaded).slice(0, BUILD_ID_LEN) })];
+    // 버전이 다르면 파일도 당연히 다르므로 버전 안내만 남긴다.
+    if (changed.length && !versionDiffers) parts.push(t('chat.clientStale', { files: changed.join(', ') }));
+    if (st.server_stale?.length) parts.push(t('chat.serverStale', { files: st.server_stale.join(', ') }));
+    return parts.join(' · ');
+  }
+
   async function refreshStatus() {
     try {
       const st = await request('GET', '/chat/status');
@@ -329,7 +388,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
       const hint = st.hint === 'choose' ? t('chat.hint.choose', { n: sessions.filter(isUsable).length }) : '';
       // 서버와 확장의 /chat 규약이 어긋날 수 있다. 업데이트한 뒤 서버를 다시 띄우지 않은 경우가 흔하다.
       const versionNote = st.version && CLIENT_VERSION && st.version !== CLIENT_VERSION ? t('chat.versionMismatch', { server: st.version, client: CLIENT_VERSION }) : '';
-      modeBadge.textContent = [modeLabel, st.target_name, statusTail(st), hint, versionNote].filter(Boolean).join(' · ');
+      modeBadge.textContent = [modeLabel, st.target_name, statusTail(st), hint, versionNote, await buildNote(st, !!versionNote)].filter(Boolean).join(' · ');
       modeBadge.title = st.target || '';
       modeBadge.dataset.mode = st.mode;
       renderTargets(st);
@@ -488,7 +547,8 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     } else if (e.kind === 'assistant') {
       const meta = view.deliveries.get(e.request_id);
       if (meta) setMeta(meta, t('chat.replied'));
-      bubble('assistant', e.text);
+      const b = bubble('assistant', e.text);
+      if (e.images && e.images.length) attachImages(b, e.images);
     } else if (e.kind === 'proposal') {
       const meta = view.deliveries.get(e.proposal.request_id);
       if (meta) setMeta(meta, t('chat.proposed'));

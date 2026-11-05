@@ -43,12 +43,69 @@ MAX_BODY = 20 * 1024 * 1024
 ID_KEEP = 2000
 GIT_TIMEOUT_S = 3
 JOIN_TIMEOUT_S = 2
+# 버전 숫자는 릴리스 때만 바뀌므로, 개발 중 코드가 바뀌었는지는 파일 내용으로 만든 빌드 ID로 알린다.
+# 화면 코드는 확장과 작업실이 같은 경로로 읽을 수 있는 파일(확장의 web_accessible_resources)만 센다.
+CLIENT_GLOBS = ("src/core/*.js", "src/panel/*.js", "src/panel/*.css")
+SERVER_FILES = ("tools/devserver.py", "tools/chat.py", "tools/targets.py")
 # 기본 대상은 명령줄을 읽은 뒤에야 알 수 있어 main()에서 만든다.
 ROUTER = None
 
 
 class RouteError(Exception):
     pass
+
+
+# 확장 쪽 JS와 같은 결과를 내야 하고 보안 용도가 아니므로, 구현이 짧은 FNV-1a 32비트를 쓴다.
+def fnv1a(data):
+    h = 0x811C9DC5
+    for b in data:
+        h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+    return f"{h:08x}"
+
+
+class Fingerprint:
+    """파일 묶음의 내용 해시. 상태 조회마다 불리므로 수정 시각과 크기가 같으면 이전 해시를 다시 쓴다."""
+
+    def __init__(self, paths):
+        self.paths = paths
+        self.lock = threading.Lock()
+        self.seen = {}
+
+    def files(self):
+        out = {}
+        with self.lock:
+            for rel in self.paths():
+                try:
+                    st = (ROOT / rel).stat()
+                except OSError:
+                    continue
+                key = (st.st_mtime_ns, st.st_size)
+                cached = self.seen.get(rel)
+                if not cached or cached[0] != key:
+                    cached = (key, fnv1a((ROOT / rel).read_bytes()))
+                    self.seen[rel] = cached
+                out[rel] = cached[1]
+        return out
+
+    @staticmethod
+    def combine(files):
+        return fnv1a("\n".join(f"{p}:{h}" for p, h in sorted(files.items())).encode("utf-8"))
+
+
+CLIENT_BUILD = Fingerprint(lambda: sorted(str(p.relative_to(ROOT)) for g in CLIENT_GLOBS for p in ROOT.glob(g)))
+SERVER_BUILD = Fingerprint(lambda: SERVER_FILES)
+# 서버가 실제로 실행 중인 코드는 시작할 때 읽은 파일이다.
+SERVER_STARTED = SERVER_BUILD.files()
+
+
+def build_info():
+    client = CLIENT_BUILD.files()
+    now = SERVER_BUILD.files()
+    return {
+        "build": {"id": Fingerprint.combine(client), "files": client},
+        "server_build": Fingerprint.combine(SERVER_STARTED),
+        "server_stale": sorted(Path(p).name for p in SERVER_STARTED if now.get(p) != SERVER_STARTED[p]),
+    }
 
 
 class Router:
@@ -192,7 +249,7 @@ class Router:
         return hub.set_proposal_status(body.get("proposal_id"), body.get("status"), body.get("note", ""))
 
     def status(self, hub, resolved_by):
-        return {**hub.status(), "version": VERSION, "targets": self.list(), "resolved_by": resolved_by}
+        return {**hub.status(), "version": VERSION, **build_info(), "targets": self.list(), "resolved_by": resolved_by}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -265,6 +322,10 @@ class Handler(SimpleHTTPRequestHandler):
         elif path == "/chat/state":
             hub, _ = ROUTER.resolve(q.get("page"), q.get("target"), q.get("cwd"))
             self._json(200, {"ok": True, **hub.get_state()})
+        elif path == "/chat/image":
+            hub, _ = ROUTER.resolve(q.get("page"), q.get("target"))
+            result = hub.image(q.get("path") or "")
+            self._json(200 if result["ok"] else 404, result)
         elif path == "/chat/wait":
             hub, _ = ROUTER.resolve(q.get("page"), q.get("target"), q.get("cwd"))
             req = hub.wait_request(float(q.get("timeout", 50)), q.get("session_id") or None)

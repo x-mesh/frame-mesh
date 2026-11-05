@@ -34,6 +34,7 @@ XM_RELAY_CLAUDE_BIN으로 tools/fm_claude_agents.py를 끼워 그 PID의 항목�
   <CMD> sessions <ARGS>                                   → stdout JSON {"sessions": [{"session_id", "name", "cwd", "pid"(선택)}]}
   <CMD> send <ARGS> --session <id> --message-file <path>  → stdout JSON {"ok": true, "state": "..."} (실패 시 ok=false 또는 0이 아닌 종료 코드)
 """
+import base64
 import json
 import os
 import re
@@ -64,6 +65,12 @@ SESSION_ENV_PATTERN = re.compile(r"_(SESSION|THREAD|CONVERSATION)_ID$")
 EVENT_KEEP = 500
 PS_TIMEOUT_S = 3
 PROCS_KEEP = 500
+# 답변 본문에 적힌 절대 경로 중 이미지 파일만 대화창에 보여 준다. URL 안의 경로(http://host/a.png)는 앞 글자로 걸러 낸다.
+# 공백이 든 경로는 백틱으로 감쌌을 때만 잡는다.
+IMAGE_PATH_PATTERN = re.compile(r"`(/[^`\n]*\.(?:png|jpe?g|gif|webp))`|(?<![\w/:.])(/[^\s'\"`<>()\[\]{}]*\.(?:png|jpe?g|gif|webp))(?!\w)", re.IGNORECASE)
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+# 이미지는 base64 JSON으로 확장의 메시지 통로를 지나므로 크기를 제한한다.
+IMAGE_MAX_BYTES = 8 * 1024 * 1024
 
 
 def _is_pid(value):
@@ -138,6 +145,8 @@ class ChatHub:
         self.pending = []
         self.page_state = {}
         self.proposals = {}
+        # 답변에 나온 이미지 경로만 내려 준다. 브라우저가 아무 로컬 파일이나 읽지 못하게 하기 위해서다.
+        self.images = set()
         self.session_id = None
         self.pinned = None
         self.session_pid = None
@@ -572,8 +581,27 @@ class ChatHub:
     def reply(self, request_id, text):
         if not (text or "").strip():
             return {"ok": False, "error": "text is empty"}
-        self._emit("assistant", request_id=request_id, text=text)
+        images = [p for p in dict.fromkeys(a or b for a, b in IMAGE_PATH_PATTERN.findall(text)) if os.path.isfile(p)]
+        with self.lock:
+            self.images.update(images)
+        self._emit("assistant", request_id=request_id, text=text, images=images)
         return {"ok": True}
+
+    def image(self, path):
+        with self.lock:
+            allowed = path in self.images
+        if not allowed:
+            return {"ok": False, "error": "This path did not appear in a reply"}
+        try:
+            size = os.path.getsize(path)
+            if size > IMAGE_MAX_BYTES:
+                return {"ok": False, "error": f"Image is larger than {IMAGE_MAX_BYTES // (1024 * 1024)} MB"}
+            with open(path, "rb") as f:
+                data = base64.b64encode(f.read()).decode("ascii")
+        except OSError as err:
+            return {"ok": False, "error": str(err)[:300]}
+        mime = IMAGE_TYPES[os.path.splitext(path)[1].lower()]
+        return {"ok": True, "data_url": f"data:{mime};base64,{data}"}
 
     def propose(self, request_id, summary, ops, reason=""):
         if not isinstance(ops, list) or not ops:

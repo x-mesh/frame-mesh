@@ -4,6 +4,13 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+- Images in the chat. If a reply has the absolute path of a PNG, JPEG, GIF, or WebP file, the chat tab shows the image under the reply. Click the image to show it at full size. Put a path that has spaces in backticks. The new path `GET /chat/image` returns only images whose path was in a reply, up to 8 MB. The `assistant` chat event has the new field `images`.
+- A build ID in the chat status line, for example `v0.3.0 · build 5b7f54d`. The ID comes from the content of `src/core` and `src/panel`, so it changes when the code changes and the version does not. The status line tells you to reload the page when these files changed after the page loaded, and to restart `frame-mesh dev` when the server code changed after the server started. `/chat/status` has the new fields `build`, `server_build`, and `server_stale`. The extension side panel shows the version next to its name.
+
+### Fixed
+- The chat request described the wrong screen when the page kept other screens hidden in the same element. The `text` field of each selected element now has the visible text (`innerText`), up to 400 characters, for all elements. Before, only elements without child elements had `text`, and the only other text was the 24-character `excerpt` from `textContent`, which includes hidden text.
+
 ## [0.2.0] - 2026-10-28
 
 ### Added

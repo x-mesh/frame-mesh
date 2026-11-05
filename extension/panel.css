@@ -3,6 +3,7 @@ html, body { height: 100%; }
 body { display: flex; flex-direction: column; background: var(--panel); min-width: 280px; }
 .ext__top { border-bottom: 1px solid var(--line); padding: 8px 10px; }
 .ext__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ext__version { color: var(--ink-3); font-size: 11px; }
 .ext__target { flex: 1; min-width: 0; color: var(--ink-2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ext__target.is-blocked { color: var(--ink-3); }
 .ext__row select { flex: 1; min-width: 120px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fafafc; font-size: 11px; }
