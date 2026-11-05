@@ -23,6 +23,27 @@ function formatComputed(value) {
   return value;
 }
 
+// 도크는 페이지와 같은 보안 조건에서 돈다. http://mac-studio-t:5173 같은 localhost가 아닌 http 페이지는 보안 컨텍스트가 아니라
+// navigator.clipboard가 없다. 그때만 사용자 클릭 안에서 쓸 수 있는 execCommand('copy')로 복사한다.
+// 모달 dialog가 열려 있으면 그 밖은 inert라 선택할 수 없으므로, 임시 입력란은 누른 버튼과 같은 곳(도크 안)에 둔다.
+async function copyText(text, near) {
+  const win = near.ownerDocument.defaultView;
+  if (win.navigator.clipboard) {
+    await win.navigator.clipboard.writeText(text);
+    return;
+  }
+  const doc = near.ownerDocument;
+  const area = doc.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.cssText = 'position: fixed; left: -9999px; top: 0; opacity: 0;';
+  near.parentNode.appendChild(area);
+  area.select();
+  const copied = doc.execCommand('copy');
+  area.remove();
+  if (!copied) throw new Error('execCommand copy was refused');
+}
+
 export function createPanel({ els, bridge, receiver, keyboard = true }) {
   const receiverStore = receiver || { get: async () => '/handoff', set: async () => {} };
   const view = {
@@ -669,7 +690,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
 
   async function copyHandoff() {
     try {
-      await navigator.clipboard.writeText(view.handoff.markdown);
+      await copyText(view.handoff.markdown, els.handoff.btnCopy);
       notice(t('panel.copied'));
     } catch (err) {
       els.handoff.text.focus();
@@ -690,7 +711,7 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     view.handoff = result;
     const applied = view.state ? view.state.cursor : 0;
     try {
-      await navigator.clipboard.writeText(result.markdown);
+      await copyText(result.markdown, els.btnCopyLog);
       notice(t('panel.copiedLlm', { n: applied }));
     } catch (err) {
       notice(t('panel.copyFailedLlm', { msg: err.message }));

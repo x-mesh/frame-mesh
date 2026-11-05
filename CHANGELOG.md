@@ -4,6 +4,9 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+- "Copy for LLM" and the copy button of the handoff dialog failed on pages that are not a secure context, for example `http://<host name>:5173` on the local network. These pages have no `navigator.clipboard`. frame-mesh now copies with `document.execCommand('copy')` when the Clipboard API is not available.
+
 ## [0.3.1] - 2026-11-05
 
 ### Fixed
