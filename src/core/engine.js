@@ -19,6 +19,8 @@ const MAX_SELECTION = 10;
 const SELECTION_TEXT_LEN = 24;
 // 대화 요청에 함께 보내는 요소 글의 길이. 요청 전체가 서버의 PAGE_DATA_LIMIT 안에 들어가도록 짧게 둔다.
 const CHAT_TEXT_LEN = 400;
+// 레이아웃 요약에 넣는 자식 요소 수. 넘으면 남은 개수만 적는다.
+const CHAT_CHILDREN_MAX = 10;
 const CHAT_STYLE_KEYS = ['display', 'width', 'height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-bottom', 'gap', 'font-size', 'font-weight', 'line-height', 'color', 'background-color', 'border-radius'];
 // DOM 변경이 잦은 페이지에서 트리 갱신을 묶어 보내는 대기 시간
 const DOM_SETTLE_MS = 300;
@@ -904,7 +906,21 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       text: (el.innerText ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, CHAT_TEXT_LEN) || undefined,
       parent: el.parentElement && el.parentElement !== doc.documentElement ? { label: describe(el.parentElement), path: elementPath(el.parentElement) } : null,
       styles: Object.fromEntries(CHAT_STYLE_KEYS.map((k) => [k, cs.getPropertyValue(k)])),
+      children: childOutline(el),
     };
+  }
+
+  // 레이아웃을 바꿀 때 필요한 안쪽 배치. 숨긴 자식은 (hidden)으로 표시해, 그 글을 화면 내용으로 오해하지 않게 한다.
+  function childOutline(el) {
+    const kids = [...el.children].filter((c) => !c.hasAttribute(UI_ATTR) && c.tagName !== 'SCRIPT' && c.tagName !== 'STYLE');
+    if (!kids.length) return undefined;
+    const lines = kids.slice(0, CHAT_CHILDREN_MAX).map((c) => {
+      if (!c.checkVisibility()) return `${describe(c)} (hidden)`;
+      const r = c.getBoundingClientRect();
+      return `${describe(c)} ${Math.round(r.width)}x${Math.round(r.height)} ${win.getComputedStyle(c).display}`;
+    });
+    if (kids.length > CHAT_CHILDREN_MAX) lines.push(`+${kids.length - CHAT_CHILDREN_MAX}`);
+    return lines;
   }
 
   // 대화 요청에 함께 보낼 페이지 문맥. 페이지 글은 자료로만 쓰이도록 짧게 줄인다.
