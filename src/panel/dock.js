@@ -334,5 +334,5 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     host.remove();
   }
 
-  return { host, update, setVisible, notice: panel.notice, destroy };
+  return { host, box: dock, update, setVisible, notice: panel.notice, destroy };
 }

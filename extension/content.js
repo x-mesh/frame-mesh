@@ -141,7 +141,7 @@
       onOpenPanel: () => chrome.runtime.sendMessage({ type: 'open-panel' }).catch(() => {}),
       onLanguage: (lang) => chrome.storage.local.set({ [LANG_KEY]: lang }),
     });
-    engine.registerUiRoot(dock.host);
+    engine.registerUiRoot(dock.host, { reserveBottom: dock.box });
     boot.dock = dock;
     const state = engine.getState({ tree: false });
     dock.update(state);

@@ -4,6 +4,10 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+- The dock and the selection outlines were under a dialog that the page opened with `showModal()`, and the dock did not take clicks. A modal dialog is in the top layer and makes the rest of the page inert. While a modal dialog is open, frame-mesh now moves the dock and the outlines into that dialog and shows them as popovers above it. When the dialog closes or goes away, they move back.
+- The dock covered the bottom of a modal dialog. While the dock is above a modal dialog, frame-mesh sets `bottom` and `max-height` of the dialog so that it fits above the dock, with a 16 px gap. The dialog follows when the dock height changes. The values go back when the dialog closes. `registerUiRoot` of the engine takes the new option `reserveBottom`.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

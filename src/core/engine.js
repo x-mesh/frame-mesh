@@ -25,6 +25,10 @@ const DOM_SETTLE_MS = 300;
 // 새로고침 뒤 늦게 그려지는 요소를 기다려 복원을 다시 시도하는 시간
 const RESTORE_RETRY_MS = 15000;
 const UI_ATTR = 'data-fm-ui';
+// 작업실 UI를 popover로 올릴 때 브라우저 기본 [popover] 상자(가운데 정렬, 테두리, 배경)를 지운다. 위치는 각 UI의 :host 규칙을 따른다.
+// 도크 위로 맞춘 모달과 화면 위·도크 사이의 여백.
+const MODAL_GAP_PX = 16;
+const LIFTED_STYLE = 'inset: auto; left: 0; top: 0; margin: 0; padding: 0; border: 0; width: 0; height: 0; overflow: visible; background: transparent;';
 // 빈 요소가 absolute/fixed로 부모(또는 기준 상자)를 이 비율 이상 덮으면 클릭 가리개(mask)로 본다.
 const MASK_ATTR = 'data-fm-mask';
 const MASK_COVER_RATIO = 0.8;
@@ -135,6 +139,11 @@ const pxLimit = (value, fallback) => (/px$/.test(value) ? parseFloat(value) : fa
 // rasterViaImage: 스크립트가 차단된 sandbox iframe 안에서는 canvas가 화면에 합성되지 않아, 그린 결과를 img로 옮겨 보여 준다.
 export function createEngine({ doc, win, source = '', onChange = () => {}, onNotice = () => {}, getViewport, viewportLabel, autoScroll, initialMode = 'select', blockNavigation = true, rasterViaImage = false, modeKeys = () => true }) {
   const state = {
+    // 모달 위로 올린 작업실 UI와 올리기 전 인라인 스타일, 지금 올라가 있는 dialog.
+    lifted: new Map(),
+    liftedTo: null,
+    // 도크 높이에 맞춰 줄인 모달과 줄이기 전 인라인 값.
+    fitted: null,
     mode: initialMode,
     moveMode: 'flow',
     selectedId: null,
@@ -166,6 +175,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   };
   const ui = {};
   const uiRoots = [];
+  const reserveEls = [];
   const listeners = [];
   const readViewport = getViewport || (() => ({ key: 'window', width: win.innerWidth }));
   const labelViewport = viewportLabel || ((op) => t('op.width', { width: op.width }));
@@ -1290,6 +1300,9 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     observer.observe(doc.body, { childList: true, subtree: true });
     ui.observer = observer;
     listeners.push(() => observer.disconnect());
+    const modalObserver = new win.MutationObserver(liftAboveModal);
+    modalObserver.observe(doc.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
+    listeners.push(() => modalObserver.disconnect());
   }
 
   const inEditing = (e) => !!(state.editing && e.composedPath().includes(state.editing.el));
@@ -2449,6 +2462,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     assignIds();
     mountOverlay();
     installHooks();
+    liftAboveModal();
     computeTypeInventory();
     onChange({ type: 'load' });
   }
@@ -2466,8 +2480,79 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   // 도크처럼 페이지 안에 띄운 작업실 UI를 등록해 선택·드래그 대상에서 제외한다.
-  function registerUiRoot(el) {
+  // reserveBottom: 화면 아래를 덮는 상자(도크). 모달을 위로 올렸을 때 모달이 이 상자 위 영역에 들어가도록 줄인다.
+  function registerUiRoot(el, { reserveBottom } = {}) {
     uiRoots.push(el);
+    if (reserveBottom) {
+      if (!ui.reserveObserver) {
+        ui.reserveObserver = new win.ResizeObserver(fitModal);
+        listeners.push(() => ui.reserveObserver.disconnect());
+      }
+      reserveEls.push(reserveBottom);
+      ui.reserveObserver.observe(reserveBottom);
+    }
+    liftAboveModal();
+  }
+
+  // 도크는 페이지 위에 겹쳐 그려진다. 모달은 화면 전체를 기준으로 가운데 놓이므로, 그대로 두면 아랫부분이 도크에 가린다.
+  // 페이지 CSS가 높이를 정해 두었을 수 있어 important 인라인 값으로 덮고, 모달이 닫히면 되돌린다.
+  function fitModal() {
+    const modal = state.liftedTo;
+    if (!modal) return;
+    const bottom = Math.max(0, ...reserveEls.map((el) => {
+      const r = el.isConnected ? el.getBoundingClientRect() : null;
+      return r && r.height > 0 ? Math.round(win.innerHeight - r.top) : 0;
+    }));
+    if (state.fitted?.el === modal && state.fitted.bottom === bottom) return;
+    if (state.fitted?.el !== modal) {
+      unfitModal();
+      const saved = (prop) => [modal.style.getPropertyValue(prop), modal.style.getPropertyPriority(prop)];
+      state.fitted = { el: modal, bottom: null, values: { bottom: saved('bottom'), 'max-height': saved('max-height') } };
+    }
+    state.fitted.bottom = bottom;
+    modal.style.setProperty('bottom', `${bottom}px`, 'important');
+    modal.style.setProperty('max-height', `calc(100dvh - ${bottom + MODAL_GAP_PX * 2}px)`, 'important');
+  }
+
+  function unfitModal() {
+    if (!state.fitted) return;
+    const { el, values } = state.fitted;
+    Object.entries(values).forEach(([prop, [value, priority]]) => {
+      if (value) el.style.setProperty(prop, value, priority);
+      else el.style.removeProperty(prop);
+    });
+    state.fitted = null;
+  }
+
+  // dialog.showModal()로 연 창은 브라우저 최상위 층(top layer)에 그려지고, 그 밖의 요소는 inert가 되어 클릭할 수 없다.
+  // z-index로는 그 위에 올릴 수 없으므로, 모달이 열려 있는 동안 작업실 UI를 그 dialog 안으로 옮기고 popover로 다시 올린다.
+  // dialog 밖에 둔 채 popover만 쓰면 보이기만 하고 inert라서 입력을 받지 못한다(Chrome에서 확인).
+  function liftAboveModal() {
+    const modal = [...doc.querySelectorAll('dialog[open]')].filter((d) => d.matches(':modal')).pop() || null;
+    const parent = modal || doc.documentElement;
+    // dialog가 작업실 UI를 품은 채 문서에서 지워질 수 있다. 그때는 문서로 되돌린다.
+    const hosts = [ui.host, ...uiRoots].filter((host) => host && (host.isConnected || state.lifted.has(host)));
+    if (state.liftedTo === modal && hosts.every((host) => host.parentNode === parent)) return;
+    if (state.liftedTo !== modal) unfitModal();
+    state.liftedTo = modal;
+    hosts.forEach((host) => {
+      if (host.matches(':popover-open')) host.hidePopover();
+      // moveBefore는 shadow 안의 입력값·포커스·애니메이션을 그대로 두고 옮긴다. 문서에서 떨어진 노드에는 쓸 수 없다.
+      if (parent.moveBefore && host.isConnected) parent.moveBefore(host, null);
+      else parent.appendChild(host);
+      if (modal) {
+        if (!state.lifted.has(host)) state.lifted.set(host, host.style.cssText);
+        host.setAttribute('popover', 'manual');
+        host.style.cssText += LIFTED_STYLE;
+      } else if (state.lifted.has(host)) {
+        host.removeAttribute('popover');
+        host.style.cssText = state.lifted.get(host);
+        state.lifted.delete(host);
+      }
+    });
+    // 나중에 연 popover가 위에 그려지므로 오버레이, 도크 순서로 연다.
+    if (modal) hosts.forEach((host) => host.showPopover());
+    fitModal();
   }
 
   return {
