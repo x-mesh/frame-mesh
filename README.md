@@ -102,6 +102,7 @@ The property panel changes padding, margin, size, position, font, font size, let
 - Values that you set show in dark text. Values that the page computes show in light text.
 - Property groups open by element type. A group with changes shows its change count.
 - The layer tree expands only the ancestors of the selection. An orange dot marks each changed element.
+- **Note**: type a note for the agent and press Enter or "Add note". The note goes to each selected element. It does not change the screen. It shows in the log and the handoff, gets a number mark on the element, and works with undo and redo. The diff does not show notes.
 
 In the extension side panel, drag the bar between layers and properties to change their heights. Double-click the bar to reset it.
 
@@ -133,6 +134,10 @@ The dock has three handoff actions.
 - **Save to project**: sends the handoff to the development server (`make dev` or `frame-mesh dev`). The server writes it to `.frame-mesh/handoffs/` in the project folder of the server.
 - **View and save file**: shows the handoff and downloads it as `.md` or `.json`.
 
+Each item in the change list starts with a change ID in brackets, for example `[c1a2b3c]`. The agent uses the ID to report what it did with each change. See "Chat with an agent".
+
+If the page defines CSS custom properties (design tokens), a style change can have a "Token (estimate)" line. The line names the `var()` that the original value comes from and the tokens whose value equals the new value. The request then tells the agent to change or use the token instead of the value. frame-mesh reads only stylesheets from the same origin as the page and does not compare specificity, so the line is an estimate.
+
 After "Save to project", give the agent a request like this one:
 
 ```text
@@ -146,6 +151,10 @@ The server also creates `.frame-mesh/.gitignore`, so Git does not track the hand
 The "Chat" tab sends requests to an AI coding agent session that runs in the target project folder. The tab is in the dock, or in the bottom panel of the web workbench. frame-mesh does not start an agent. Each request includes the selected elements, their main styles, and the current diff.
 
 Above the input, the chat tab shows the selected elements, as in `Selected li.check-item · Scope approval`. Each name shows the start of the element text, so elements with the same class are different. After you send a request, its bubble keeps these elements in an "About" row. The row stays after the reply. Click a name in the row to select the elements on the page again. frame-mesh finds each element by its element ID first, then by its path. If an element is not on the page, a notice shows the number of missing elements.
+
+In the extension, turn on "Attach capture" next to the selected elements to send a PNG of the selected area with each request. The switch is off by default. The capture does not show the frame-mesh outlines and the dock. frame-mesh saves it to `.frame-mesh/handoffs/` and gives the path in the request. If the capture fails, the request goes without it and a notice shows. The web workbench does not have this switch.
+
+"Apply to source" sends the handoff to the agent. After the agent edits the source, it reports `applied` or `skipped` for each change ID with `fm_report_changes` or `frame-mesh report`. The log then shows "Applied by agent" or "Skipped by agent" next to each change. Move the pointer over the label to read the note of the agent.
 
 A request goes to the session through `xm relay`. A session with the frame-mesh MCP answers with the MCP tools. A session without it answers with `frame-mesh` shell commands. One server can serve more than one project. See "Several projects on one server".
 
@@ -315,10 +324,11 @@ A session without the frame-mesh MCP answers with shell commands. The request me
 |---|---|
 | `frame-mesh reply <id> [text]` | Writes a text answer. If `text` is empty or `-`, the command reads the text from stdin. |
 | `frame-mesh propose <id> --summary S --reason R [--ops-file F]` | Proposes a screen change. The ops JSON array comes from stdin or from the file `F`. |
+| `frame-mesh report <id> [--file F]` | Reports `applied` or `skipped` for each change after an "Apply to source" request. The JSON array comes from stdin or from the file `F`. |
 | `frame-mesh state` | Reads the selection and the current diff. |
 | `frame-mesh connect` | Sends chat requests to this session. Run it with `!` in a Claude Code session. See "Connect a session". |
 
-All four commands accept `--url URL`. The default address is `FRAME_MESH_URL`, or `http://127.0.0.1:4173` if it is not set.
+These commands accept `--url URL`. The default address is `FRAME_MESH_URL`, or `http://127.0.0.1:4173` if it is not set.
 
 ```bash
 frame-mesh reply 3f9c1a2b <<'EOF'
@@ -330,7 +340,7 @@ frame-mesh propose 3f9c1a2b --summary "Reduce the card padding" --reason "The ca
 EOF
 ```
 
-The commands `reply`, `propose`, and `state` print one JSON line. If `ok` is false, the exit code is 1. `connect` prints text lines. If the input is invalid, the command writes one line to stderr and the exit code is 2. Invalid input is an empty text, ops that are not valid JSON, or ops that are not an array.
+The commands `reply`, `propose`, `report`, and `state` print one JSON line. If `ok` is false, the exit code is 1. `connect` prints text lines. If the input is invalid, the command writes one line to stderr and the exit code is 2. Invalid input is an empty text, ops that are not valid JSON, or ops that are not an array.
 
 If the `PATH` of the server has no `frame-mesh`, the message uses the absolute path of `bin/frame-mesh`.
 
@@ -359,6 +369,7 @@ Without this rule, a dialog appears at each reply. The rule allows every `frame-
 | `fm_get_state` | Reads the selection, the current diff, and the status of each sent proposal. |
 | `fm_reply` | Writes a text answer in the chat. |
 | `fm_propose` | Proposes a screen change with a reason. The change applies only after the user previews and accepts it. |
+| `fm_report_changes` | Reports `applied` or `skipped`, with an optional note, for each change ID after an "Apply to source" request. |
 | `fm_wait_request` | Waits for the next chat request. Use it when `xm` is not available. |
 
 Under each request, the chat shows its delivery state. While the request waits for a reply ("Delivered · Waiting for a reply" or "Agent picked it up · Waiting for a reply"), a small animation shows before the text. If your system reduces motion, the animation does not move.
@@ -476,11 +487,11 @@ For `/chat/*` and `/handoff`, the server accepts browser requests only from its 
 src/core/      Editor engine (selection, move, resize, history, measure, diff) and handoff builder
 src/panel/     Layer and property panels, the dock for the extension, and the chat tab
 src/web/       Web workbench host (iframe preview, viewports)
-bin/           The `frame-mesh` command (`dev`, `mcp`, `reply`, `propose`, `state`, `connect`, `whoami`, and `version`)
+bin/           The `frame-mesh` command (`dev`, `mcp`, `reply`, `propose`, `report`, `state`, `connect`, `whoami`, and `version`)
 extension/     Extension background script, content script, and side panel
 tools/         Development server, page-to-project lookup, chat relay, MCP server, reply command, and `xm` wrapper
 tools/demo/    Demo recorder (`make demo`)
-fixtures/      Sample mockups (static page, late render, card with a link overlay)
+fixtures/      Sample mockups (static page, late render, card with a link overlay, design tokens)
 docs/          Demo GIFs
 ```
 
