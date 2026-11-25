@@ -4,6 +4,8 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-25
+
 ### Added
 - The agent reports the result of each change. Each change has an ID, for example `c1a2b3c`, and the handoff shows it in brackets at the start of each item. After an "Apply to source" request, the agent reports `applied` or `skipped` with an optional note for each change through the new MCP tool `fm_report_changes` or the new command `frame-mesh report` (JSON array on stdin or `--file`). The change log shows "Applied by agent" or "Skipped by agent", and the note shows on hover. The chat shows the counts under the request. The new path is `POST /chat/changes`. The new chat event is `change_status`, and `/chat/state` has the new field `change_status`. Each item in `changes` of `getState` has the new fields `id`, `agent`, and `agentNote`. The engine has the new method `setChangeStatus`.
 - Notes on elements. Select one or more elements, type a note under "Note" in the properties panel, and press Enter or "Add note". A note does not change the screen. It goes to the change log and the handoff as "Note (no change on the screen)", gets a number mark on the element, and works with undo, redo, and restore like other changes. The diff leaves notes out. The chat request has the new field `notes`. The engine has the new method `addNote`.
