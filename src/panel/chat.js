@@ -155,6 +155,9 @@ function waitingOrb(doc) {
   };
 }
 
+// 한 요청에 붙일 수 있는 캡처 수. 서버의 SHOT_MAX와 같아야 한다.
+const SHOT_MAX = 5;
+
 export function createChat({ root, transport, bridge, notice = () => {}, page = null, capture = null }) {
   const doc = root.ownerDocument;
   const el = (tag, cls, text) => {
@@ -164,7 +167,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     return n;
   };
   // epoch: 대상이 바뀔 때마다 올라간다. 이전 대상으로 보낸 이벤트 조회가 늦게 돌아와도 버리기 위해서다.
-  const view = { pendingShot: null, openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
+  const view = { pendingShots: [], openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
 
   // 전달 상태 문구를 바꾼다. 응답 대기 상태면 문구 앞에 대기 표시를 두고, 다른 상태로 바뀌면 그리기를 멈춘다.
   function setMeta(meta, text, waiting = false) {
@@ -227,40 +230,57 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
   // 보낼 때 그 그림을 함께 보내고, ✕로 뺄 수 있다.
   const attachRow = el('div', 'chat__attach');
   attachRow.hidden = true;
-  function setPendingShot(dataUrl) {
-    view.pendingShot = dataUrl || null;
+  function renderShots() {
     attachRow.textContent = '';
-    attachRow.hidden = !view.pendingShot;
-    if (!view.pendingShot) return;
-    const img = el('img', 'chat__attach-img');
-    img.src = view.pendingShot;
-    img.alt = t('chat.attached');
-    const remove = el('button', 'chat__attach-remove', '✕');
-    remove.type = 'button';
-    remove.title = t('chat.attachRemove');
-    remove.setAttribute('aria-label', t('chat.attachRemove'));
-    remove.addEventListener('click', () => setPendingShot(null));
-    attachRow.append(img, el('span', 'chat__attach-label', t('chat.attached')), remove);
+    attachRow.hidden = !view.pendingShots.length;
+    view.pendingShots.forEach((dataUrl, i) => {
+      const item = el('div', 'chat__attach-item');
+      const img = el('img', 'chat__attach-img');
+      img.src = dataUrl;
+      img.alt = t('chat.attachedN', { n: i + 1 });
+      const remove = el('button', 'chat__attach-remove', '✕');
+      remove.type = 'button';
+      remove.title = t('chat.attachRemove');
+      remove.setAttribute('aria-label', t('chat.attachRemove'));
+      remove.addEventListener('click', () => {
+        view.pendingShots = view.pendingShots.filter((_, j) => j !== i);
+        renderShots();
+      });
+      item.append(img, remove);
+      attachRow.appendChild(item);
+    });
+    if (view.pendingShots.length) attachRow.appendChild(el('span', 'chat__attach-label', t('chat.attachedCount', { n: view.pendingShots.length, max: SHOT_MAX })));
   }
-  let capturing = false;
-  async function captureNow() {
-    if (!capture || capturing) return;
-    capturing = true;
-    try {
-      const shot = await capture();
-      if (shot && shot.dataUrl) {
-        setPendingShot(shot.dataUrl);
-        input.focus();
-      } else {
-        const reason = shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : shot && shot.error === 'no selection' ? t('chat.captureNoSelection') : (shot && shot.error) || '?';
-        notice(t('chat.captureFailed', { msg: reason }));
-      }
-    } catch (err) {
-      notice(t('chat.captureFailed', { msg: err.message }));
-    } finally {
-      capturing = false;
+  // 캡처는 한 번에 하나씩 한다(UI를 숨기고 찍는 동안 겹치면 안 된다). 앞 캡처가 끝나기 전에 누른 것도 버리지 않고 이어서 찍는다.
+  let captureChain = Promise.resolve();
+  let captureQueued = 0;
+  function captureNow() {
+    if (!capture) return Promise.resolve();
+    if (view.pendingShots.length + captureQueued >= SHOT_MAX) {
+      notice(t('chat.captureMax', { n: SHOT_MAX }));
+      return captureChain;
     }
+    captureQueued += 1;
+    captureChain = captureChain.then(async () => {
+      try {
+        const shot = await capture();
+        if (shot && shot.dataUrl) {
+          view.pendingShots = [...view.pendingShots, shot.dataUrl];
+          renderShots();
+          input.focus();
+        } else {
+          const reason = shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : shot && shot.error === 'no selection' ? t('chat.captureNoSelection') : (shot && shot.error) || '?';
+          notice(t('chat.captureFailed', { msg: reason }));
+        }
+      } catch (err) {
+        notice(t('chat.captureFailed', { msg: err.message }));
+      } finally {
+        captureQueued -= 1;
+      }
+    });
+    return captureChain;
   }
+
   form.append(pickedRow, attachRow, input, el('div', 'chat__actions'));
   form.lastChild.append(btnSend, btnApply);
   root.append(head, list, form);
@@ -474,14 +494,17 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     } catch (_) {
       // 문맥 없이도 보낼 수 있다. 엔진이 아직 준비되지 않은 경우다.
     }
-    const screenshot = view.pendingShot;
+    const screenshots = view.pendingShots;
     try {
-      const res = await request('POST', '/chat/send', { text, context, content, kind, ...(screenshot ? { screenshot } : {}) });
+      const res = await request('POST', '/chat/send', { text, context, content, kind, ...(screenshots.length ? { screenshots } : {}) });
       if (res.ok && res.content_error) notice(t('chat.contentFailed', { msg: res.content_error }));
       if (res.ok && res.screenshot_error) notice(t('chat.screenshotFailed', { msg: res.screenshot_error }));
       if (!res.ok) throw new Error(res.error || t('chat.sendFailedBody'));
       // 보낸 뒤에만 뺀다. 보내지 못하면 붙인 그림을 그대로 두어 다시 보낼 수 있다.
-      if (screenshot && view.pendingShot === screenshot) setPendingShot(null);
+      if (screenshots.length) {
+        view.pendingShots = view.pendingShots.filter((s) => !screenshots.includes(s));
+        renderShots();
+      }
       if (res.mode === 'manual') notice(t('chat.queuedNotice'));
       refreshStatus();
     } catch (err) {

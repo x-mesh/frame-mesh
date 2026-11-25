@@ -125,7 +125,10 @@
     try {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const res = await chrome.runtime.sendMessage({ type: 'capture', rect });
-      return res && res.ok ? { dataUrl: res.dataUrl, width: res.width, height: res.height } : { error: (res && res.error) || 'capture failed' };
+      if (res && res.ok) return { dataUrl: res.dataUrl, width: res.width, height: res.height };
+      // 실패 원인을 재현 없이 알 수 있도록 영역과 함께 남긴다.
+      console.warn('frame-mesh: capture failed', { error: res && res.error, rect });
+      return { error: (res && res.error) || 'capture failed' };
     } finally {
       engine.setUiHidden(false);
     }
