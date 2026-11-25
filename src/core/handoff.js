@@ -74,7 +74,14 @@ export function diffText(diff) {
   return diff.map((d) => [`@@ ${d.label} — ${d.currentPath || d.path}`, ...d.lines.map((l) => `${l.sign} ${l.text}`)].join('\n')).join('\n\n');
 }
 
-export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId, htmlMode, diff = [] }) {
+function tokenLine(h) {
+  const parts = [];
+  if (h.from.length) parts.push(t('handoff.tokenFrom', { names: h.from.map((n) => `\`${n}\``).join(', ') }));
+  if (h.match.length) parts.push(t('handoff.tokenMatch', { names: h.match.map((n) => `\`${n}\``).join(', ') }));
+  return `   - ${t('handoff.token', { prop: h.prop })}: ${parts.join(' ')}`;
+}
+
+export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId, htmlMode, diff = [], tokens = null }) {
   // 복원 실패(새로고침 뒤 요소를 찾지 못한) 변경은 적용되지 않았으므로 따로 적는다.
   const applied = ops.slice(0, cursor).filter((op) => !op.lost);
   const lostOps = ops.slice(0, cursor).filter((op) => op.lost);
@@ -91,7 +98,8 @@ export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId
     const now = currentPath(op.target);
     const moved = now && now !== op.path ? t('handoff.nowAt', { path: now }) : '';
     const lost = now ? '' : ` ${t('handoff.lost')}`;
-    return `${i + 1}. [${op.id}] \`${op.label}\` — ${describeOp(op)} [${viewportLabel(op)}]\n   - ${t('handoff.origPath')}: \`${op.path}\`${moved}${lost}`;
+    const hints = tokens ? tokens.byOp.get(op.id) || [] : [];
+    return [`${i + 1}. [${op.id}] \`${op.label}\` — ${describeOp(op)} [${viewportLabel(op)}]`, `   - ${t('handoff.origPath')}: \`${op.path}\`${moved}${lost}`, ...hints.map(tokenLine)].join('\n');
   });
 
   const resultSection = [];
@@ -127,6 +135,9 @@ export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId
     t('handoff.req.scope'),
     applied.some((op) => op.kind === 'text') ? t('handoff.req.text', { label: t('op.textLabel') }) : null,
     hasOffset ? t('handoff.req.offset', { label: t('op.offsetLabel') }) : null,
+    tokens && tokens.byOp.size ? t('handoff.req.tokens') : null,
+    tokens && tokens.skipped ? t('handoff.tokensSkipped', { n: tokens.skipped }) : null,
+    tokens && tokens.truncated ? t('handoff.tokensTruncated', { n: tokens.count }) : null,
     t('handoff.req.verify'),
     '',
     ...resultSection,
@@ -139,7 +150,7 @@ export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId
     source: sourceName,
     exportedAt: new Date().toISOString(),
     htmlMode: mode,
-    operations: applied.map((op, i) => ({ n: i + 1, ...op, description: describeOp(op), currentPath: currentPath(op.target) })),
+    operations: applied.map((op, i) => ({ n: i + 1, ...op, description: describeOp(op), currentPath: currentPath(op.target), tokens: tokens ? tokens.byOp.get(op.id) || [] : [] })),
     undoneCount: undone,
     diff,
     lostOperations: lostOps.map((op) => ({ ...op, description: describeOp(op) })),

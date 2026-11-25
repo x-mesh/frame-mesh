@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>frame-mesh 토큰 시험</title>
+<!-- frame-mesh가 디자인 토큰을 찾는지 확인하는 시험 페이지. :root 토큰, @layer 안 토큰, 단축 속성, 명시도가 다른 규칙을 담는다. -->
+<style>
+  :root { --space-2: 8px; --space-4: 16px; --space-6: 24px; --brand: #5b3df5; --ink: #1f1a2e; }
+  @layer theme {
+    :root { --radius-md: 0.5rem; --radius-lg: 12px; }
+  }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: var(--ink); }
+  .card { padding: var(--space-2); border-radius: var(--radius-md); background: #f4f2ff; margin: var(--space-4); }
+  .card__title { color: var(--brand); margin: 0 0 var(--space-2); }
+  #special.card { padding-top: 4px; }
+  .card.wide { padding-left: var(--space-6); }
+</style>
+</head>
+<body>
+  <section class="card" id="plain">
+    <h2 class="card__title">기본 카드</h2>
+    <p>padding은 단축 속성 <code>padding: var(--space-2)</code>로 정했습니다.</p>
+  </section>
+  <section class="card wide" id="special">
+    <h2 class="card__title">명시도 시험</h2>
+    <p><code>#special.card</code>가 padding-top을 4px로 덮고, 뒤에 오는 <code>.card.wide</code>는 padding-left만 정합니다.</p>
+  </section>
+</body>
+</html>
