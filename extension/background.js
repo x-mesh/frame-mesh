@@ -37,8 +37,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // 대화 요청에 붙일 캡처. 보이는 탭을 찍고 선택 영역만 잘라 PNG data URL로 돌려준다.
 // 자르기는 여기서 한다. 페이지 안(content script)에서 data URL 그림을 읽으면 페이지 CSP에 막힐 수 있다.
+// Chrome은 captureVisibleTab을 초당 2번까지만 허용하고, 넘으면 MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND 오류를 낸다.
+// 이어서 여러 장을 찍을 때 이 오류만 한 번 기다렸다가 다시 찍는다. 다른 오류는 그대로 돌려준다.
+const CAPTURE_RETRY_MS = 600;
+
+async function captureTab(windowId) {
+  try {
+    return await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  } catch (err) {
+    if (!String(err && err.message).includes('MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND')) throw err;
+    await new Promise((r) => setTimeout(r, CAPTURE_RETRY_MS));
+    return chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  }
+}
+
 async function captureRegion(windowId, rect) {
-  const shot = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  const shot = await captureTab(windowId);
   const bitmap = await createImageBitmap(await (await fetch(shot)).blob());
   const scale = bitmap.width / rect.viewportWidth;
   const sx = Math.round(rect.left * scale);
