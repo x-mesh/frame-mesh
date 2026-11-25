@@ -223,9 +223,8 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
   btnApply.title = t('chat.applyTitle');
   const pickedRow = el('div', 'chat__picked');
   pickedRow.hidden = true;
-  // 캡처는 확장에서만 할 수 있다. capture가 없으면(웹 작업실) 버튼을 그리지 않는다.
-  // 누르면 바로 찍어 입력창 위에 붙인다. 보낼 때 그 그림을 함께 보내고, ✕로 뺄 수 있다.
-  const shotBtn = capture ? el('button', 'chat__shot', t('chat.captureNow')) : null;
+  // 캡처는 확장에서만 할 수 있다. 도크의 "캡처" 버튼과 우클릭 메뉴가 captureNow를 부르면 바로 찍어 입력창 위에 붙인다.
+  // 보낼 때 그 그림을 함께 보내고, ✕로 뺄 수 있다.
   const attachRow = el('div', 'chat__attach');
   attachRow.hidden = true;
   function setPendingShot(dataUrl) {
@@ -243,25 +242,24 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     remove.addEventListener('click', () => setPendingShot(null));
     attachRow.append(img, el('span', 'chat__attach-label', t('chat.attached')), remove);
   }
-  if (shotBtn) {
-    shotBtn.type = 'button';
-    shotBtn.title = t('chat.captureNowTitle');
-    shotBtn.addEventListener('click', async () => {
-      shotBtn.disabled = true;
-      try {
-        const shot = await capture();
-        if (shot && shot.dataUrl) {
-          setPendingShot(shot.dataUrl);
-          input.focus();
-        } else {
-          notice(t('chat.captureFailed', { msg: shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : (shot && shot.error) || '?' }));
-        }
-      } catch (err) {
-        notice(t('chat.captureFailed', { msg: err.message }));
-      } finally {
-        shotBtn.disabled = false;
+  let capturing = false;
+  async function captureNow() {
+    if (!capture || capturing) return;
+    capturing = true;
+    try {
+      const shot = await capture();
+      if (shot && shot.dataUrl) {
+        setPendingShot(shot.dataUrl);
+        input.focus();
+      } else {
+        const reason = shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : shot && shot.error === 'no selection' ? t('chat.captureNoSelection') : (shot && shot.error) || '?';
+        notice(t('chat.captureFailed', { msg: reason }));
       }
-    });
+    } catch (err) {
+      notice(t('chat.captureFailed', { msg: err.message }));
+    } finally {
+      capturing = false;
+    }
   }
   form.append(pickedRow, attachRow, input, el('div', 'chat__actions'));
   form.lastChild.append(btnSend, btnApply);
@@ -297,7 +295,6 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
         more.title = current.map(targetChipText).join(', ');
         pickedRow.appendChild(more);
       }
-      if (shotBtn) pickedRow.appendChild(shotBtn);
     }
     if (atBottom) scrollDown();
   }
@@ -661,5 +658,6 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     },
     focus() { input.focus(); },
     setSelection,
+    captureNow,
   };
 }
