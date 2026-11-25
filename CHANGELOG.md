@@ -4,6 +4,9 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+- Secondary text in the dock and the panels, for example the version, the status line, and the layer details, had a contrast ratio of 2.8:1 on white. The color `--ink-3` is now `#696973` (5.4:1 on white, 4.8:1 on a selected row), above the WCAG AA level of 4.5:1.
+
 ## [0.4.0] - 2026-11-05
 
 ### Added

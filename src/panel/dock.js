@@ -12,7 +12,7 @@ const DOCK_MAX_RATIO = 0.6;
 
 // panel.css의 토큰은 :root에 있어 Shadow DOM 안에 닿지 않으므로 host에 다시 정의한다.
 const DOCK_CSS = `
-:host { all: initial; display: block; --bg: #e9e9ee; --panel: #ffffff; --line: #e2e2e8; --ink: #1d1d22; --ink-2: #5c5c66; --ink-3: #9a9aa6; --accent: #0d99ff; --accent-soft: rgba(13, 153, 255, 0.12); --hover: #7c3aed; --modified: #f59e0b; --warn-bg: #fff4e5; --warn-ink: #9a4b00; --font: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; --mono: "SF Mono", Menlo, Consolas, monospace; --dock-h: 180px; }
+:host { all: initial; display: block; --bg: #e9e9ee; --panel: #ffffff; --line: #e2e2e8; --ink: #1d1d22; --ink-2: #5c5c66; --ink-3: #696973; --accent: #0d99ff; --accent-soft: rgba(13, 153, 255, 0.12); --hover: #7c3aed; --modified: #f59e0b; --warn-bg: #fff4e5; --warn-ink: #9a4b00; --font: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; --mono: "SF Mono", Menlo, Consolas, monospace; --dock-h: 180px; }
 :host([hidden]) { display: none; }
 .dock { position: fixed; left: 0; right: 0; bottom: 0; height: var(--dock-h); display: flex; flex-direction: column; background: var(--panel); color: var(--ink); border-top: 1px solid var(--line); box-shadow: 0 -6px 24px rgba(0,0,0,0.12); font: 12px/1.45 var(--font); z-index: 2147483647; }
 .dock.is-collapsed { height: auto; }
