@@ -116,6 +116,21 @@
     return fn(...args);
   };
 
+  // 선택 영역을 캡처한다. 외곽선과 도크가 그림에 들어가지 않도록 숨기고, 두 프레임을 기다려 화면에 반영된 뒤 찍는다.
+  async function captureSelection(engine) {
+    const rect = engine.getSelectionRect();
+    if (!rect) return { error: 'no selection' };
+    if (rect.offscreen) return { error: 'offscreen' };
+    engine.setUiHidden(true);
+    try {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const res = await chrome.runtime.sendMessage({ type: 'capture', rect });
+      return res && res.ok ? { dataUrl: res.dataUrl, width: res.width, height: res.height } : { error: (res && res.error) || 'capture failed' };
+    } finally {
+      engine.setUiHidden(false);
+    }
+  }
+
   // 페이지 아래 도크: 도구 모음·변경 로그·전달. 엔진과 같은 세계에 있어 포트 없이 직접 부른다.
   async function mountDock(engine) {
     const [{ createDock }, css] = await Promise.all([
@@ -140,6 +155,7 @@
       // 사이드 패널은 사용자 동작 안에서만 열 수 있어, 클릭 처리 중에 바로 요청한다.
       onOpenPanel: () => chrome.runtime.sendMessage({ type: 'open-panel' }).catch(() => {}),
       onLanguage: (lang) => chrome.storage.local.set({ [LANG_KEY]: lang }),
+      capture: () => captureSelection(engine),
     });
     engine.registerUiRoot(dock.host, { reserveBottom: dock.box });
     boot.dock = dock;

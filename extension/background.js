@@ -34,3 +34,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     .catch((err) => sendResponse({ ok: false, error: err.message }));
   return true;
 });
+
+// 대화 요청에 붙일 캡처. 보이는 탭을 찍고 선택 영역만 잘라 PNG data URL로 돌려준다.
+// 자르기는 여기서 한다. 페이지 안(content script)에서 data URL 그림을 읽으면 페이지 CSP에 막힐 수 있다.
+async function captureRegion(windowId, rect) {
+  const shot = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  const bitmap = await createImageBitmap(await (await fetch(shot)).blob());
+  const scale = bitmap.width / rect.viewportWidth;
+  const sx = Math.round(rect.left * scale);
+  const sy = Math.round(rect.top * scale);
+  const sw = Math.max(1, Math.min(bitmap.width - sx, Math.round(rect.width * scale)));
+  const sh = Math.max(1, Math.min(bitmap.height - sy, Math.round(rect.height * scale)));
+  const canvas = new OffscreenCanvas(sw, sh);
+  canvas.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
+  const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return { dataUrl: `data:image/png;base64,${btoa(bin)}`, width: sw, height: sh };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== 'capture' || !sender.tab || !msg.rect) return false;
+  captureRegion(sender.tab.windowId, msg.rect)
+    .then((res) => sendResponse({ ok: true, ...res }))
+    .catch((err) => sendResponse({ ok: false, error: err.message }));
+  return true;
+});
