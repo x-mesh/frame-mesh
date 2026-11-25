@@ -206,8 +206,6 @@ button { cursor: pointer; }
 .chat__picked[hidden] { display: none; }
 .chat__picked-chip { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 7px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); font: 10px/1.6 var(--mono); }
 .chat__picked-more { color: var(--ink-3); font: 10px var(--mono); }
-.chat__shot { padding: 1px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink-2); font-size: 10px; }
-.chat__shot:hover { border-color: var(--accent); color: var(--ink); }
 .chat__attach { flex: 1 0 100%; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-2); }
 .chat__attach[hidden] { display: none; }
 .chat__attach-img { max-width: 240px; max-height: 72px; border: 1px solid var(--line); border-radius: 4px; object-fit: contain; background: var(--panel); }

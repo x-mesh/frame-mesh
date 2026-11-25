@@ -144,6 +144,9 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const btnRedo = historyBtn('btnRedo', '↷', t('dock.redo'), t('dock.redoTitle'));
   const btnReset = historyBtn('btnReset', '⟲', t('dock.reset'), t('dock.resetTitle'));
   btnReset.classList.add('btn--reset');
+  // 캡처는 확장에서만 된다. capture가 없으면(웹 작업실) 버튼을 그리지 않는다.
+  const btnCapture = capture ? btn('btnCapture', t('dock.capture'), t('dock.captureTitle')) : null;
+  if (btnCapture) btnCapture.disabled = true;
   btnReset.disabled = true;
   btnUndo.disabled = true;
   btnRedo.disabled = true;
@@ -173,7 +176,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   ]);
   const btnCollapse = btn('btnCollapse', '▾', t('dock.collapseTitle'), ' icon');
   const bar = el('div', { class: 'dock__bar' }, [
-    el('div', { class: 'dock__group' }, [modeToggle, moveToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset]),
+    el('div', { class: 'dock__group' }, [modeToggle, moveToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset, ...(btnCapture ? [el('span', { class: 'sep' }), btnCapture] : [])]),
     el('div', { class: 'dock__group' }, [applied, tabs, btnCopyLog, moreMenu, btnCollapse]),
   ]);
   const grip = el('div', { class: 'dock__grip', title: t('dock.grip') });
@@ -205,6 +208,12 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   // 요약 탭을 열면 페이지 위 차이 표시도 함께 켠다.
   tabDiff.addEventListener('click', () => { showTab('diff'); bridge.call('setDiffView', true); });
   tabChat.addEventListener('click', () => showTab('chat'));
+  // 대화 탭으로 넘어간 뒤 찍는다. 대화창이 아직 없으면 showTab이 만든다.
+  const captureToChat = () => {
+    showTab('chat');
+    if (chat) chat.captureNow();
+  };
+  if (btnCapture) btnCapture.addEventListener('click', captureToChat);
   const status = el('div', { class: 'dock__status', id: 'status', text: '' });
   const dock = el('div', { class: 'dock' }, [grip, peekbar, bar, changes, diffView, chatView, status]);
 
@@ -313,6 +322,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     dock.classList.toggle('is-editing', state.mode === 'select');
     renderApplied();
     chat?.setSelection(state.selections || []);
+    if (btnCapture) btnCapture.disabled = !(state.selections && state.selections.length);
     panel.update({ ...state, tree: undefined });
     status.textContent = t('dock.status', { source: state.source, n: state.elementCount });
     status.title = t('dock.statusTitle');
@@ -334,5 +344,6 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     host.remove();
   }
 
-  return { host, box: dock, update, setVisible, notice: panel.notice, destroy };
+  const contextActions = capture ? [{ label: t('dock.captureMenu'), run: captureToChat }] : [];
+  return { host, box: dock, update, setVisible, notice: panel.notice, destroy, contextActions };
 }

@@ -113,6 +113,8 @@ const OVERLAY_CSS = `
 .picker__row.is-mask { color: #9a9aa6; }
 .picker__label { overflow: hidden; text-overflow: ellipsis; }
 .picker__size { color: #9a9aa6; }
+.picker__sep { border-top: 1px solid #e2e2e8; }
+.picker__row--action { color: #1d1d22; font-weight: 600; }
 .xray { position: fixed; left: 0; top: 0; pointer-events: none; }
 .xray[hidden] { display: none; }
 .ruler { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 3; }
@@ -154,6 +156,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     moveMode: 'flow',
     selectedId: null,
     extraIds: [],
+    // 우클릭 목록 아래에 붙일 호스트 작업 [{ label, run }]
+    contextActions: [],
     // 선택한 요소의 {path, label, excerpt}. 페이지가 목록을 다시 그려 요소가 바뀌면 이것으로 새 요소를 찾는다.
     selRefs: new Map(),
     hoverId: null,
@@ -1441,10 +1445,10 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) masks.push({ el: m, mask: true });
     });
     // 목록이 길면 깊은 조상부터 자르고, 가리개 항목은 항상 남긴다.
-    showPicker(x, y, [...entries.slice(0, Math.max(1, PICKER_MAX - masks.length)), ...masks]);
+    showPicker(x, y, [...entries.slice(0, Math.max(1, PICKER_MAX - masks.length)), ...masks], entries[0] ? entries[0].el : null);
   }
 
-  function showPicker(x, y, entries) {
+  function showPicker(x, y, entries, target = null) {
     const p = ui.picker;
     p.textContent = '';
     if (!entries.length) {
@@ -1474,6 +1478,25 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       });
       p.appendChild(row);
     });
+    // 호스트가 넣은 작업(확장의 캡처 등). 누른 자리의 요소가 선택에 없으면 그 요소를 먼저 선택한 뒤 실행한다.
+    if (state.contextActions.length && target) {
+      const sep = doc.createElement('div');
+      sep.className = 'picker__sep';
+      p.appendChild(sep);
+      state.contextActions.forEach((action) => {
+        const row = doc.createElement('div');
+        row.className = 'picker__row picker__row--action';
+        row.textContent = action.label;
+        row.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          hidePicker();
+          ensureAncestorsIds(target);
+          if (!selectionIds().includes(target.dataset.fmId)) select(target.dataset.fmId);
+          action.run();
+        });
+        p.appendChild(row);
+      });
+    }
     p.hidden = false;
     p.style.transform = `translate(${x + win.scrollX + 2}px, ${y + win.scrollY + 2}px) scale(calc(1 / var(--fm-scale)))`;
   }
@@ -2601,6 +2624,10 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     });
   }
 
+  function setContextActions(actions) {
+    state.contextActions = Array.isArray(actions) ? actions.filter((a) => a && a.label && typeof a.run === 'function') : [];
+  }
+
   function registerUiRoot(el, { reserveBottom } = {}) {
     uiRoots.push(el);
     if (reserveBottom) {
@@ -2679,7 +2706,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     init, destroy, select, selectParent, setMode, holdInteract, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
     undo: () => { ensureLive(); history.undo(); }, redo: () => { ensureLive(); history.redo(); }, goto: (n) => { ensureLive(); history.goto(n); },
     setPeek, getDiff, setDiffView, editText,
-    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus, addNote, getSelectionRect, setUiHidden,
+    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus, addNote, getSelectionRect, setUiHidden, setContextActions,
     refresh: updateOverlays, getState, getHandoff, exportOps, restoreOps, clearHistory,
     get selectedId() { return state.selectedId; },
   };

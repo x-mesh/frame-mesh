@@ -158,6 +158,7 @@
       capture: () => captureSelection(engine),
     });
     engine.registerUiRoot(dock.host, { reserveBottom: dock.box });
+    engine.setContextActions(dock.contextActions);
     boot.dock = dock;
     const state = engine.getState({ tree: false });
     dock.update(state);
