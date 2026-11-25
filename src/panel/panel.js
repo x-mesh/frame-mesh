@@ -623,11 +623,6 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
 
   // ---------- 모드와 버튼 ----------
   function installControls() {
-    if (els.modeToggle) {
-      els.modeToggle.addEventListener('click', () => {
-        if (view.state) call('setMode', view.state.mode === 'select' ? 'interact' : 'select');
-      });
-    }
     if (els.modeSeg) {
       els.modeSeg.addEventListener('click', (e) => {
         const b = e.target.closest('.seg__btn');
@@ -682,10 +677,6 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     if (els.btnUndo) els.btnUndo.disabled = !state.canUndo;
     if (els.btnRedo) els.btnRedo.disabled = !state.canRedo;
     if (els.btnReset) els.btnReset.disabled = !state.canUndo;
-    if (els.modeToggle) {
-      els.modeToggle.setAttribute('aria-checked', String(state.mode === 'select'));
-      els.modeLabel.textContent = state.mode === 'select' ? t('mode.editing') : state.holding ? t('mode.holding') : t('mode.using');
-    }
     if (els.modeSeg) els.modeSeg.querySelectorAll('.seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === state.mode));
     if (els.moveToggle) els.moveToggle.setAttribute('aria-checked', String(state.moveMode === 'free'));
   }
@@ -811,7 +802,12 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       call('setMode', view.state.mode === 'select' ? 'interact' : 'select');
       return;
     }
-    if (plain && e.key === ' ' && !e.repeat && view.state && view.state.mode === 'select') {
+    if (plain && isLetterKey(e, 's') && !e.shiftKey && !e.repeat && view.state) {
+      e.preventDefault();
+      call('setMode', view.state.mode === 'pick' ? 'interact' : 'pick');
+      return;
+    }
+    if (plain && e.key === ' ' && !e.repeat && view.state && (view.state.mode === 'select' || view.state.mode === 'pick')) {
       e.preventDefault();
       spaceHeld = true;
       call('holdInteract', true);
@@ -837,12 +833,14 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       call('selectParent');
       return;
     }
-    if (e.key === 'Enter' && !mod && view.state && view.state.selection && view.state.selection.editable) {
+    // 방향키 이동과 Enter 문구 편집은 요소를 바꾸므로 편집 모드에서만 한다. 선택 모드는 고르기만 한다.
+    const editMode = view.state && view.state.mode === 'select';
+    if (editMode && e.key === 'Enter' && !mod && view.state.selection && view.state.selection.editable) {
       e.preventDefault();
       call('editText', view.selectionId);
       return;
     }
-    if (ARROW_DELTAS[e.key] && view.selectionId && !mod) {
+    if (editMode && ARROW_DELTAS[e.key] && view.selectionId && !mod) {
       e.preventDefault();
       const step = e.shiftKey ? 10 : 1;
       const [dx, dy] = ARROW_DELTAS[e.key];

@@ -128,7 +128,7 @@ function onMessage(msg) {
     const chip = $('appliedChip');
     chip.classList.toggle('is-clean', !n);
     chip.textContent = n ? t('ext.chipN', { n }) : t('ext.chipClean');
-    setStatus(t('ext.status', { source: msg.state.source, n: msg.state.elementCount, mode: msg.state.mode === 'select' ? t('ext.modeSelect') : t('ext.modeInteract') }));
+    setStatus(t('ext.status', { source: msg.state.source, n: msg.state.elementCount, mode: msg.state.mode === 'select' ? t('ext.modeSelect') : msg.state.mode === 'pick' ? t('ext.modePick') : t('ext.modeInteract') }));
   } else if (msg.type === 'notice') {
     panel.notice(msg.message);
   } else if (msg.type === 'result') {

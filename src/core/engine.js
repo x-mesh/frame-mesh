@@ -100,6 +100,7 @@ const OVERLAY_CSS = `
 .size { left: 50%; top: 100%; margin-top: 4px; transform-origin: 50% 0; translate: -50% 0; }
 .ov--hover .tag { background: var(--fm-hover); }
 .ov--container .tag { opacity: 0.85; }
+.ov--select.is-pick .handle { display: none; }
 .handle { position: absolute; width: 8px; height: 8px; background: #fff; border: 1.5px solid var(--fm-accent); border-radius: 1px; pointer-events: auto; transform: scale(calc(1 / var(--fm-scale))); }
 .handle[data-dir="e"] { right: -4px; top: 50%; margin-top: -4px; cursor: ew-resize; }
 .handle[data-dir="s"] { bottom: -4px; left: 50%; margin-left: -4px; cursor: ns-resize; }
@@ -132,11 +133,11 @@ const OVERLAY_CSS = `
 
 // iframe 안(광고 등 다른 출처 문서)은 엔진이 닿지 않아 클릭이 그대로 링크로 간다. 선택 모드에서는 iframe이 클릭을 받지 않게 해 바깥 컨테이너가 잡히게 한다.
 const PAGE_CSS = `
-html[data-fm-mode="select"] * { cursor: default !important; user-select: none !important; }
+html[data-fm-mode="select"] *, html[data-fm-mode="pick"] * { cursor: default !important; user-select: none !important; }
 html[data-fm-mode="select"] [data-fm-editing], html[data-fm-mode="select"] [data-fm-editing] * { cursor: text !important; user-select: text !important; -webkit-user-select: text !important; }
 [data-fm-editing] { outline: 2px solid #f59e0b !important; outline-offset: 2px !important; background: rgba(245, 158, 11, 0.08) !important; }
-html[data-fm-mode="select"] [data-fm-mask] { pointer-events: none !important; }
-html[data-fm-mode="select"] iframe, html[data-fm-mode="select"] frame { pointer-events: none !important; }
+html[data-fm-mode="select"] [data-fm-mask], html[data-fm-mode="pick"] [data-fm-mask] { pointer-events: none !important; }
+html[data-fm-mode="select"] iframe, html[data-fm-mode="select"] frame, html[data-fm-mode="pick"] iframe, html[data-fm-mode="pick"] frame { pointer-events: none !important; }
 [data-fm-dragging] { opacity: 0.35 !important; }
 `;
 
@@ -190,6 +191,10 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   const readViewport = getViewport || (() => ({ key: 'window', width: win.innerWidth }));
   const labelViewport = viewportLabel || ((op) => t('op.width', { width: op.width }));
   const scroller = autoScroll || defaultAutoScroll;
+  // 모드: 'interact'(페이지 사용), 'pick'(선택만: 고르기와 우클릭 메뉴), 'select'(편집: 선택에 더해 이동·크기·방향키·문구 편집).
+  // picking은 요소를 고를 수 있는 두 모드, editing은 요소를 바꿀 수 있는 편집 모드다.
+  const picking = (mode = state.mode) => mode === 'select' || mode === 'pick';
+  const editing = () => state.mode === 'select';
   const tokens = createTokenIndex({ doc, win, uiAttr: UI_ATTR });
   const history = new History({ apply: applyOp, revert: revertOp, onChange: onHistoryChange });
   const sumPx = (cs, keys) => keys.reduce((sum, k) => sum + (parseFloat(cs[k]) || 0), 0);
@@ -635,6 +640,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function updateOverlays() {
     // 이동하면 경로가 바뀌므로, 화면을 그릴 때마다 선택 요소의 위치 정보를 새로 적어 둔다.
     rememberSelection();
+    // 선택 모드에서는 크기 핸들을 숨긴다. 고르기만 하는 모드라 바꿀 수 있는 것처럼 보이면 안 된다.
+    ui.select.classList.toggle('is-pick', state.mode === 'pick');
     placeOverlay(ui.select, state.selectedId, true);
     // 추가 선택 요소 위에서는 hover 상자를 숨긴다. 같은 자리에 점선 둘이 겹쳐 보이기 때문이다.
     const hover = state.hoverId && state.hoverId !== state.selectedId && !state.extraIds.includes(state.hoverId) ? state.hoverId : null;
@@ -650,7 +657,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   // 적용 중인 변경이 있는 요소마다 주황 점선과 변경 번호를 붙여, 원래 페이지 상태로 오해하지 않게 한다.
   function renderMarks() {
     ui.marks.textContent = '';
-    if (state.mode !== 'select' || state.peek || state.diffView) return;
+    if (!picking() || state.peek || state.diffView) return;
     const byTarget = new Map();
     history.ops.slice(0, history.cursor).forEach((op, i) => {
       if (op.lost) return;
@@ -744,7 +751,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function renderDiffView() {
     if (!ui.dv) return;
     ui.dv.textContent = '';
-    if (!state.diffView || state.peek || state.mode !== 'select') return;
+    if (!state.diffView || state.peek || !picking()) return;
     const diff = getDiff();
     if (!diff.length) return;
     const originals = measureOriginals(diff.map((d) => d.id));
@@ -1320,7 +1327,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   function installHooks() {
     doc.documentElement.setAttribute('data-fm-mode', state.mode);
-    if (state.mode === 'select') releasePageFocus();
+    if (picking()) releasePageFocus();
     listen(doc, 'keydown', onKeydown, true);
     listen(doc, 'keyup', onKeyup, true);
     listen(win, 'blur', () => holdInteract(false));
@@ -1341,7 +1348,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     // 선택 모드에서는 페이지 스크립트가 일으키는 이동(배너의 location 변경 등)도 막는다. 링크를 따라가려면 동작 모드로 바꾼다.
     if (win.navigation) {
       listen(win.navigation, 'navigate', (e) => {
-        if (state.mode !== 'select' || !e.cancelable || e.hashChange || e.downloadRequest) return;
+        if (!picking() || !e.cancelable || e.hashChange || e.downloadRequest) return;
         e.preventDefault();
         onNotice(t('engine.navBlocked'));
       });
@@ -1360,7 +1367,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   const inEditing = (e) => !!(state.editing && e.composedPath().includes(state.editing.el));
 
   function swallowInSelectMode(e) {
-    if (state.mode !== 'select' || isUiEvent(e) || inEditing(e)) return;
+    if (!picking() || isUiEvent(e) || inEditing(e)) return;
     e.preventDefault();
     e.stopPropagation();
   }
@@ -1372,7 +1379,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       if (e.target.closest && e.target.closest('button, a[href]')) e.preventDefault();
       return;
     }
-    if (state.mode === 'select') {
+    if (picking()) {
       e.preventDefault();
       e.stopPropagation();
       if (state.suppressClick) {
@@ -1403,7 +1410,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   function onDblClick(e) {
-    if (state.mode !== 'select' || isUiEvent(e) || inEditing(e)) return;
+    if (!picking() || isUiEvent(e) || inEditing(e)) return;
     e.preventDefault();
     e.stopPropagation();
     const hit = targetElement(e);
@@ -1411,7 +1418,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     const selected = byId(state.selectedId);
     // 이미 고른 글자 요소를 다시 더블클릭하면 문구 편집을 시작한다.
     if (selected && selected === hit && isTextLeaf(hit)) {
-      editText(hit.dataset.fmId);
+      if (editing()) editText(hit.dataset.fmId);
       return;
     }
     if (selected && selected !== hit && selected.contains(hit)) {
@@ -1425,7 +1432,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   // Figma의 "아래 레이어 선택"처럼, 그 지점에 겹친 요소를 위에서부터 나열해 고르게 한다. 가리개도 목록에는 넣는다.
   function onContextMenu(e) {
-    if (state.mode !== 'select' || isUiEvent(e)) return;
+    if (!picking() || isUiEvent(e)) return;
     e.preventDefault();
     e.stopPropagation();
     const x = e.clientX;
@@ -1506,7 +1513,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   function onHover(e) {
-    if (state.mode !== 'select' || state.drag || isUiEvent(e)) return;
+    if (!picking() || state.drag || isUiEvent(e)) return;
     const hit = targetElement(e);
     if (!hit) {
       setHover(null);
@@ -1638,12 +1645,22 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   }
 
   function setMode(mode) {
+    if (!['interact', 'pick', 'select'].includes(mode)) return;
+    const wasPicking = picking();
     state.mode = mode;
     doc.documentElement.setAttribute('data-fm-mode', mode);
-    if (mode === 'select') releasePageFocus();
+    if (picking(mode)) releasePageFocus();
     hidePicker();
     if (mode !== 'select' && state.editing) finishEdit(true);
-    if (mode !== 'select') {
+    // 편집에서 선택으로 바꾸면 선택은 그대로 두고, 진행 중인 끌기와 크기 조절만 끝낸다.
+    if (mode === 'pick' && state.drag) {
+      const d = state.drag;
+      state.drag = null;
+      stopAutoScroll();
+      if (d.phase !== 'pending') cancelDrag(d);
+    }
+    if (mode === 'pick') endResize();
+    if (!picking(mode)) {
       // 선택 모드 밖에서는 측정·분해 표시도 거둔다. 패널이 닫힌 뒤 화면에 남으면 안 된다.
       state.measure = false;
       ui.hover.classList.remove('is-measure');
@@ -1975,13 +1992,14 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     // 편집 중인 요소 밖을 누르면 편집을 확정한다.
     if (state.editing) finishEdit(true);
     hidePicker();
-    if (state.mode !== 'select' || e.button !== 0) return;
+    if (!picking() || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     releasePageFocus();
     state.suppressClick = false;
     // Shift+클릭은 선택을 더하고 빼는 동작이라, 이어지는 끌기가 선택을 단일로 되돌리거나 요소를 옮기지 않게 드래그를 시작하지 않는다.
-    if (e.shiftKey) return;
+    // 선택 모드는 고르기만 하므로 끌어도 옮기지 않는다. 선택은 이어지는 click이 한다.
+    if (e.shiftKey || !editing()) return;
     const hit = targetElement(e);
     if (!hit || hit === doc.body) return;
     const el = deepSelect(e) ? hit : grabUnit(hit);
@@ -2332,15 +2350,15 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   // Space를 누르는 동안만 페이지를 쓴다. 손을 떼면 선택과 보기 표시를 그대로 되살린다.
   function holdInteract(on) {
     if (on) {
-      if (state.hold || state.mode !== 'select') return;
-      state.hold = { selectedId: state.selectedId, extraIds: state.extraIds, measure: state.measure, xray: state.xray, focus: state.focus, diffView: state.diffView };
+      if (state.hold || !picking()) return;
+      state.hold = { mode: state.mode, selectedId: state.selectedId, extraIds: state.extraIds, measure: state.measure, xray: state.xray, focus: state.focus, diffView: state.diffView };
       setMode('interact');
       return;
     }
     const h = state.hold;
     if (!h) return;
     state.hold = null;
-    setMode('select');
+    setMode(h.mode || 'select');
     if (h.measure) setMeasure(true);
     if (h.xray) setXray(true);
     if (h.focus) setFocus(true);
@@ -2368,7 +2386,15 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       setMode(state.mode === 'select' ? 'interact' : 'select');
       return;
     }
-    if (state.mode !== 'select') return;
+    // S: 선택 모드 켜기·끄기. 편집 중이면 선택 모드로 내린다.
+    if (isLetterKey(e, 's') && !e.shiftKey && !e.repeat && modeKeyTarget(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      holdInteract(false);
+      setMode(state.mode === 'pick' ? 'interact' : 'pick');
+      return;
+    }
+    if (!picking()) return;
     if (e.key === ' ' && !e.repeat && modeKeyTarget(e)) {
       e.preventDefault();
       holdInteract(true);
@@ -2388,7 +2414,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       }
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !isEditable(e.composedPath()[0])) {
+    if (editing() && e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !isEditable(e.composedPath()[0])) {
       const sel = byId(state.selectedId);
       if (sel && isTextLeaf(sel)) {
         e.preventDefault();
@@ -2430,7 +2456,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       selectParent();
       return;
     }
-    if (ARROW_DELTAS[e.key] && state.selectedId && !mod) {
+    if (editing() && ARROW_DELTAS[e.key] && state.selectedId && !mod) {
       e.preventDefault();
       const step = e.shiftKey ? 10 : 1;
       const [dx, dy] = ARROW_DELTAS[e.key];

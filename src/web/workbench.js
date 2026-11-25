@@ -277,7 +277,7 @@ function renderStatus() {
   }
   ui.status.textContent = [t('wb.status.static', { name: state.sourceName }), t('wb.status.elements', { n: s.elementCount }), t('wb.status.viewport', { w: state.viewportWidth }), t('wb.status.render', { time: timeLabel(state.renderedAt) })].join(' · ');
   const moveHint = s.moveMode === 'flow' ? t('wb.hint.flow') : t('wb.hint.free');
-  ui.statusRight.textContent = t('wb.hint.blocked', { mode: s.mode === 'select' ? t('wb.hint.select', { move: moveHint }) : t('wb.hint.interact') });
+  ui.statusRight.textContent = t('wb.hint.blocked', { mode: s.mode === 'select' ? t('wb.hint.select', { move: moveHint }) : s.mode === 'pick' ? t('wb.hint.pick') : t('wb.hint.interact') });
   const overflow = Math.round(state.overflowX);
   ui.overflowBadge.hidden = overflow < 1;
   ui.overflowBadge.textContent = t('wb.overflow', { n: overflow });
