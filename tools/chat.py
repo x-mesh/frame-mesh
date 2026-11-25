@@ -74,6 +74,11 @@ IMAGE_MAX_BYTES = 8 * 1024 * 1024
 # 선택 요소의 전체 내용(context 파일) 상한과 대상마다 남겨 둘 파일 수. 엔진의 CHAT_CONTENT_LIMIT과 같은 값이다.
 CONTEXT_LIMIT = 200000
 CONTEXT_KEEP = 20
+# 에이전트가 적용 요청을 처리한 뒤 변경마다 알리는 상태. id는 엔진이 만드는 변경 ID(c + 영숫자 6자)다.
+CHANGE_STATUSES = ("applied", "skipped")
+CHANGE_ID_PATTERN = re.compile(r"^c[0-9a-z]{6}$")
+CHANGE_REPORT_MAX = 200
+CHANGE_NOTE_MAX = 500
 CONTEXT_SUFFIX = "-context.md"
 
 
@@ -159,6 +164,7 @@ class ChatHub:
         self.pending = []
         self.page_state = {}
         self.proposals = {}
+        self.change_status = {}
         # 답변에 나온 이미지 경로만 내려 준다. 브라우저가 아무 로컬 파일이나 읽지 못하게 하기 위해서다.
         self.images = set()
         self.session_id = None
@@ -466,6 +472,8 @@ class ChatHub:
                 f"- Text reply: fm_reply(request_id=\"{rid}\", text=...)",
                 f"- Screen change proposal: fm_propose(request_id=\"{rid}\", summary=..., reason=..., ops=[...]). Write the reason in one or two sentences. The change applies only after the user previews and accepts it.",
                 "- Current selection and changes: fm_get_state()",
+                *([f"- After you edit the source: fm_report_changes(request_id=\"{rid}\", changes=[{{\"id\": \"c1a2b3c\", \"status\": \"applied\"}}, {{\"id\": ..., \"status\": \"skipped\", \"note\": \"<why>\"}}]). "
+                   "Report every change in the handoff file. The id is in brackets at the start of each item. The user sees the status next to each change."] if req.get("kind") == "apply" else []),
                 "Do not edit source files unless the user asks you to apply the changes to the source.",
             ]
         fm = self._frame_mesh_command()
@@ -483,6 +491,10 @@ class ChatHub:
             "  EOF",
             f"  Each op: kind is style, text, or move. path and label come from the page data or `{fm} state`. style needs prop and value. text needs value. move needs parentPath, parentLabel, and index. The change applies only after the user previews and accepts it.",
             f"- Current selection and changes: {fm} state{url}",
+            *([f"- After you edit the source, report each change in the handoff file (JSON array on stdin). The id is in brackets at the start of each item:",
+               f"  {fm} report {rid}{url} <<'EOF'",
+               '  [{"id": "c1a2b3c", "status": "applied"}, {"id": "c4d5e6f", "status": "skipped", "note": "<why>"}]',
+               "  EOF"] if req.get("kind") == "apply" else []),
             "Do not edit source files unless the user asks you to apply the changes to the source.",
         ]
 
@@ -655,6 +667,25 @@ class ChatHub:
         self._emit("proposal_status", proposal_id=pid, status=status, note=note)
         return {"ok": True}
 
+    def report_changes(self, request_id, changes):
+        if not isinstance(changes, list) or not changes:
+            return {"ok": False, "error": "changes must be a non-empty array"}
+        if len(changes) > CHANGE_REPORT_MAX:
+            return {"ok": False, "error": f"changes has more than {CHANGE_REPORT_MAX} items"}
+        items = []
+        for i, c in enumerate(changes, 1):
+            if not isinstance(c, dict) or not isinstance(c.get("id"), str) or not CHANGE_ID_PATTERN.match(c["id"]):
+                return {"ok": False, "error": f"changes[{i}]: id must be a change id such as c1a2b3c from the handoff file"}
+            if c.get("status") not in CHANGE_STATUSES:
+                return {"ok": False, "error": f"changes[{i}]: status must be applied or skipped"}
+            note = c.get("note")
+            items.append({"id": c["id"], "status": c["status"], "note": note.strip()[:CHANGE_NOTE_MAX] if isinstance(note, str) else ""})
+        with self.lock:
+            for item in items:
+                self.change_status[item["id"]] = {**item, "request_id": request_id}
+        self._emit("change_status", request_id=request_id, changes=items)
+        return {"ok": True, "reported": len(items)}
+
     def set_page_state(self, state):
         self.page_state = state or {}
         return {"ok": True}
@@ -663,4 +694,5 @@ class ChatHub:
         return {
             "page": self.page_state,
             "proposals": [{k: p.get(k) for k in ("id", "request_id", "summary", "reason", "status")} for p in self.proposals.values()],
+            "change_status": list(self.change_status.values()),
         }

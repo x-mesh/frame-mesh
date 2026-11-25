@@ -4,6 +4,9 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+- The agent reports the result of each change. Each change has an ID, for example `c1a2b3c`, and the handoff shows it in brackets at the start of each item. After an "Apply to source" request, the agent reports `applied` or `skipped` with an optional note for each change through the new MCP tool `fm_report_changes` or the new command `frame-mesh report` (JSON array on stdin or `--file`). The change log shows "Applied by agent" or "Skipped by agent", and the note shows on hover. The chat shows the counts under the request. The new path is `POST /chat/changes`. The new chat event is `change_status`, and `/chat/state` has the new field `change_status`. Each item in `changes` of `getState` has the new fields `id`, `agent`, and `agentNote`. The engine has the new method `setChangeStatus`.
+
 ### Fixed
 - Secondary text in the dock and the panels, for example the version, the status line, and the layer details, had a contrast ratio of 2.8:1 on white. The color `--ink-3` is now `#696973` (5.4:1 on white, 4.8:1 on a selected row), above the WCAG AA level of 4.5:1.
 

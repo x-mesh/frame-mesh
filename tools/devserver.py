@@ -244,6 +244,10 @@ class Router:
         hub = self._owner(self.requests, body.get("request_id"), "request")
         return hub.reply(body.get("request_id"), body.get("text"))
 
+    def report_changes(self, body):
+        hub = self._owner(self.requests, body.get("request_id"), "request")
+        return hub.report_changes(body.get("request_id"), body.get("changes"))
+
     def set_proposal_status(self, body):
         hub = self._owner(self.proposals, body.get("proposal_id"), "proposal")
         return hub.set_proposal_status(body.get("proposal_id"), body.get("status"), body.get("note", ""))
@@ -384,6 +388,8 @@ class Handler(SimpleHTTPRequestHandler):
             return ROUTER.reply(body)
         if path == "/chat/propose":
             return ROUTER.propose(body)
+        if path == "/chat/changes":
+            return ROUTER.report_changes(body)
         if path == "/chat/proposal":
             return ROUTER.set_proposal_status(body)
         if path == "/chat/state":

@@ -90,7 +90,7 @@ export function buildHandoff({ sourceName, ops, cursor, doc, viewportLabel, byId
     const now = currentPath(op.target);
     const moved = now && now !== op.path ? t('handoff.nowAt', { path: now }) : '';
     const lost = now ? '' : ` ${t('handoff.lost')}`;
-    return `${i + 1}. \`${op.label}\` — ${describeOp(op)} [${viewportLabel(op)}]\n   - ${t('handoff.origPath')}: \`${op.path}\`${moved}${lost}`;
+    return `${i + 1}. [${op.id}] \`${op.label}\` — ${describeOp(op)} [${viewportLabel(op)}]\n   - ${t('handoff.origPath')}: \`${op.path}\`${moved}${lost}`;
   });
 
   const resultSection = [];

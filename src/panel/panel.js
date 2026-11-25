@@ -565,7 +565,8 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
       const time = c.at ? new Date(c.at).toTimeString().slice(0, 8) : '';
       if (c.lost) li.classList.add('change--lost');
       const flag = c.lost ? t('panel.restoreFailed') : c.restored ? t('panel.restored') : '';
-      li.innerHTML = `<span class="change__n">${c.n}</span><span class="change__time">${time}</span><span class="change__target">${esc(c.label)}</span><span class="change__desc">${esc(c.desc)}${flag ? ` <span class="change__flag">${flag}</span>` : ''}</span><span class="change__vp">${esc(c.vp)}</span>`;
+      const agent = c.agent ? `<span class="change__agent is-${c.agent}" title="${esc(c.agentNote || '')}">${t(`panel.agent.${c.agent}`)}</span>` : '';
+      li.innerHTML = `<span class="change__n">${c.n}</span><span class="change__time">${time}</span><span class="change__target">${esc(c.label)}</span><span class="change__desc">${esc(c.desc)}${flag ? ` <span class="change__flag">${flag}</span>` : ''}${agent}</span><span class="change__vp">${esc(c.vp)}</span>`;
       li.addEventListener('click', () => call('goto', c.n));
       els.changes.appendChild(li);
     });
