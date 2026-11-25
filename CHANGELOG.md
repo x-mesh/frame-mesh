@@ -12,6 +12,7 @@ All notable changes to frame-mesh are in this file. The format follows [Keep a C
 
 ### Changed
 - The session list in the chat tab shows the terminal device and the start time of each session, as in `6afb0f3c · ttys054 · started 16:29`. Before, only a session that ran in more than one terminal showed them, and other sessions showed only the first 8 characters of the session ID.
+- A session that registered with the MCP now shows the name that `xm relay sessions` reports for it, which is the title of the Claude Code session, and its state (busy or idle). Before, it showed only the first 8 characters of the session ID. If `xm` does not list the session, the ID stays.
 
 ### Fixed
 - Secondary text in the dock and the panels, for example the version, the status line, and the layer details, had a contrast ratio of 2.8:1 on white. The color `--ink-3` is now `#696973` (5.4:1 on white, 4.8:1 on a selected row), above the WCAG AA level of 4.5:1.
