@@ -415,6 +415,25 @@ export function createPanel({ els, bridge, receiver, keyboard = true }) {
     struct.appendChild(row);
     root.appendChild(struct);
 
+    const memo = section(t('panel.memo'));
+    const memoRow = doc.createElement('div');
+    memoRow.className = 'props__memo';
+    const memoInput = Object.assign(doc.createElement('input'), { type: 'text', className: 'props__memo-input', placeholder: t('panel.memoPlaceholder') });
+    memoInput.setAttribute('aria-label', t('panel.memo'));
+    const addMemo = async () => {
+      const res = await call('addNote', memoInput.value);
+      if (res && res.added) memoInput.value = '';
+    };
+    memoInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        addMemo();
+      }
+    });
+    memoRow.append(memoInput, actionButton(t('panel.memoAdd'), addMemo, t('panel.memoTitle')));
+    memo.appendChild(memoRow);
+    root.appendChild(memo);
+
     PROP_GROUPS.forEach((group) => {
       const sec = doc.createElement('div');
       sec.className = 'props__section props__group';

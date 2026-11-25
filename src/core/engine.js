@@ -19,6 +19,7 @@ const MAX_SELECTION = 10;
 const SELECTION_TEXT_LEN = 24;
 // 대화 요청에 함께 보내는 요소 글의 길이. 요청 전체가 서버의 PAGE_DATA_LIMIT 안에 들어가도록 짧게 둔다.
 const CHAT_TEXT_LEN = 400;
+const NOTE_MAX = 1000;
 // 레이아웃 요약에 넣는 자식 요소 수. 넘으면 남은 개수만 적는다.
 const CHAT_CHILDREN_MAX = 10;
 // context 파일 상한(글자 수). 서버의 CONTEXT_LIMIT과 같은 값이다.
@@ -962,6 +963,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       }),
       applied: appliedCount(),
       diff: getDiff().map((d) => ({ label: d.label, path: d.currentPath || d.path, lines: d.lines.map((l) => `${l.sign} ${l.text}`) })),
+      notes: flatten(applied()).filter((op) => op.kind === 'note').map((op) => ({ label: op.label, path: op.path, text: op.text })),
     };
   }
 
@@ -973,6 +975,8 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   function getDiff() {
     const byTarget = new Map();
     flatten(applied()).forEach((op) => {
+      // 메모는 화면을 바꾸지 않으므로 차이에 넣지 않는다.
+      if (op.kind === 'note') return;
       if (!byTarget.has(op.target)) byTarget.set(op.target, { label: op.label, path: op.path, props: new Map(), move: null });
       const entry = byTarget.get(op.target);
       const record = (prop, before, after) => {
@@ -1804,6 +1808,20 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     onChange({ type: 'history', kind: op ? op.kind : 'clear' });
   }
 
+  // 선택한 요소마다 화면을 바꾸지 않는 메모를 변경 기록에 남긴다. 번호 표식, 실행 취소, 복원, handoff는 다른 변경과 같다.
+  function addNote(text) {
+    ensureLive();
+    const body = String(text || '').trim().slice(0, NOTE_MAX);
+    if (!body) return { added: 0 };
+    const els = selectedElements();
+    if (!els.length) {
+      onNotice(t('engine.noteNoSelection'));
+      return { added: 0 };
+    }
+    els.forEach((el) => history.push({ kind: 'note', ...opBase(el), text: body }));
+    return { added: els.length };
+  }
+
   // 에이전트가 적용 요청을 처리하고 알린 변경별 결과를 변경 기록에 남긴다. 이력에 없는 ID는 센다.
   function setChangeStatus(items) {
     let unknown = 0;
@@ -2618,7 +2636,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     init, destroy, select, selectParent, setMode, holdInteract, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
     undo: () => { ensureLive(); history.undo(); }, redo: () => { ensureLive(); history.redo(); }, goto: (n) => { ensureLive(); history.goto(n); },
     setPeek, getDiff, setDiffView, editText,
-    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus,
+    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus, addNote,
     refresh: updateOverlays, getState, getHandoff, exportOps, restoreOps, clearHistory,
     get selectedId() { return state.selectedId; },
   };

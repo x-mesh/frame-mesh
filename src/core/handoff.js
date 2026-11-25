@@ -24,6 +24,7 @@ export function elementPath(el) {
 export function describeOp(op) {
   const dflt = t('op.default');
   if (op.kind === 'batch') return t('op.proposal', { summary: op.summary, n: op.ops.length, ops: op.ops.map(describeOp).join('; ') }) + (op.reason ? t('op.reason', { reason: op.reason }) : '');
+  if (op.kind === 'note') return t('op.note', { text: op.text });
   if (op.kind === 'style') return `${op.prop}: ${op.before || dflt} → ${op.after || dflt}`;
   if (op.kind === 'text') {
     const cut = (s) => (s.length > 40 ? `${s.slice(0, 40)}…` : s);
