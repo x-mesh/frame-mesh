@@ -164,7 +164,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     return n;
   };
   // epoch: 대상이 바뀔 때마다 올라간다. 이전 대상으로 보낸 이벤트 조회가 늦게 돌아와도 버리기 위해서다.
-  const view = { attachShot: false, openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
+  const view = { pendingShot: null, openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
 
   // 전달 상태 문구를 바꾼다. 응답 대기 상태면 문구 앞에 대기 표시를 두고, 다른 상태로 바뀌면 그리기를 멈춘다.
   function setMeta(meta, text, waiting = false) {
@@ -223,18 +223,47 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
   btnApply.title = t('chat.applyTitle');
   const pickedRow = el('div', 'chat__picked');
   pickedRow.hidden = true;
-  // 캡처는 확장에서만 할 수 있다. capture가 없으면(웹 작업실) 토글을 그리지 않는다.
-  const shotToggle = capture ? el('button', 'chat__shot', t('chat.attachShot')) : null;
-  if (shotToggle) {
-    shotToggle.type = 'button';
-    shotToggle.title = t('chat.attachShotTitle');
-    shotToggle.setAttribute('aria-pressed', 'false');
-    shotToggle.addEventListener('click', () => {
-      view.attachShot = !view.attachShot;
-      shotToggle.setAttribute('aria-pressed', String(view.attachShot));
+  // 캡처는 확장에서만 할 수 있다. capture가 없으면(웹 작업실) 버튼을 그리지 않는다.
+  // 누르면 바로 찍어 입력창 위에 붙인다. 보낼 때 그 그림을 함께 보내고, ✕로 뺄 수 있다.
+  const shotBtn = capture ? el('button', 'chat__shot', t('chat.captureNow')) : null;
+  const attachRow = el('div', 'chat__attach');
+  attachRow.hidden = true;
+  function setPendingShot(dataUrl) {
+    view.pendingShot = dataUrl || null;
+    attachRow.textContent = '';
+    attachRow.hidden = !view.pendingShot;
+    if (!view.pendingShot) return;
+    const img = el('img', 'chat__attach-img');
+    img.src = view.pendingShot;
+    img.alt = t('chat.attached');
+    const remove = el('button', 'chat__attach-remove', '✕');
+    remove.type = 'button';
+    remove.title = t('chat.attachRemove');
+    remove.setAttribute('aria-label', t('chat.attachRemove'));
+    remove.addEventListener('click', () => setPendingShot(null));
+    attachRow.append(img, el('span', 'chat__attach-label', t('chat.attached')), remove);
+  }
+  if (shotBtn) {
+    shotBtn.type = 'button';
+    shotBtn.title = t('chat.captureNowTitle');
+    shotBtn.addEventListener('click', async () => {
+      shotBtn.disabled = true;
+      try {
+        const shot = await capture();
+        if (shot && shot.dataUrl) {
+          setPendingShot(shot.dataUrl);
+          input.focus();
+        } else {
+          notice(t('chat.captureFailed', { msg: shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : (shot && shot.error) || '?' }));
+        }
+      } catch (err) {
+        notice(t('chat.captureFailed', { msg: err.message }));
+      } finally {
+        shotBtn.disabled = false;
+      }
     });
   }
-  form.append(pickedRow, input, el('div', 'chat__actions'));
+  form.append(pickedRow, attachRow, input, el('div', 'chat__actions'));
   form.lastChild.append(btnSend, btnApply);
   root.append(head, list, form);
 
@@ -268,7 +297,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
         more.title = current.map(targetChipText).join(', ');
         pickedRow.appendChild(more);
       }
-      if (shotToggle) pickedRow.appendChild(shotToggle);
+      if (shotBtn) pickedRow.appendChild(shotBtn);
     }
     if (atBottom) scrollDown();
   }
@@ -448,22 +477,14 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     } catch (_) {
       // 문맥 없이도 보낼 수 있다. 엔진이 아직 준비되지 않은 경우다.
     }
-    let screenshot = null;
-    if (capture && view.attachShot && context.selections && context.selections.length) {
-      // 캡처하지 못해도 요청은 첨부 없이 보낸다. 실패는 알림으로 보인다.
-      try {
-        const shot = await capture();
-        if (shot && shot.dataUrl) screenshot = shot.dataUrl;
-        else notice(t('chat.captureFailed', { msg: shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : (shot && shot.error) || '?' }));
-      } catch (err) {
-        notice(t('chat.captureFailed', { msg: err.message }));
-      }
-    }
+    const screenshot = view.pendingShot;
     try {
       const res = await request('POST', '/chat/send', { text, context, content, kind, ...(screenshot ? { screenshot } : {}) });
       if (res.ok && res.content_error) notice(t('chat.contentFailed', { msg: res.content_error }));
       if (res.ok && res.screenshot_error) notice(t('chat.screenshotFailed', { msg: res.screenshot_error }));
       if (!res.ok) throw new Error(res.error || t('chat.sendFailedBody'));
+      // 보낸 뒤에만 뺀다. 보내지 못하면 붙인 그림을 그대로 두어 다시 보낼 수 있다.
+      if (screenshot && view.pendingShot === screenshot) setPendingShot(null);
       if (res.mode === 'manual') notice(t('chat.queuedNotice'));
       refreshStatus();
     } catch (err) {
