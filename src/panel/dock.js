@@ -24,6 +24,11 @@ const DOCK_CSS = `
 .btn--history:disabled { color: var(--ink-3); font-weight: 400; opacity: 0.6; }
 /* 편집 중에는 위 테두리를 파란색으로 칠해 버튼을 보지 않아도 모드를 알 수 있게 한다. */
 .dock.is-editing { border-top: 3px solid var(--accent); }
+.dock.is-picking { border-top: 3px solid var(--hover); }
+.mode-seg .seg__btn { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.mode-seg .seg__btn kbd { font: 10px var(--mono); opacity: 0.7; }
+.mode-seg .seg__btn.is-active[data-mode="select"] { background: var(--accent); }
+.mode-seg .seg__btn.is-active[data-mode="pick"] { background: var(--hover); }
 .dock.is-collapsed .changes, .dock.is-collapsed .dock__grip, .dock.is-collapsed .dock__status { display: none; }
 .dock__grip { height: 6px; cursor: ns-resize; flex: none; }
 .dock__grip:hover, .dock__grip.is-active { background: var(--accent-soft); }
@@ -128,8 +133,18 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   const closeMenusOutside = (e) => { if (!e.composedPath().includes(host)) menus.forEach((m) => { m.hidden = true; }); };
   doc.addEventListener('click', closeMenusOutside, true);
 
-  const modeLabel = el('span', { text: t('mode.editing') });
-  const modeToggle = el('button', { class: 'mode-switch', id: 'modeToggle', type: 'button', role: 'switch', 'aria-checked': 'true', title: t('dock.modeTitle') }, [el('span', { class: 'mode-switch__track' }), modeLabel, el('kbd', { text: 'E' })]);
+  // 사용 · 선택 · 편집. 선택은 고르기만 하고, 편집은 고른 요소를 옮기고 바꾼다.
+  const modeBtn = (mode, label, key, title) => {
+    const b = segBtn('data-mode', mode, label, mode === 'select');
+    b.title = title;
+    if (key) b.appendChild(el('kbd', { text: key }));
+    return b;
+  };
+  const modeSeg = el('div', { class: 'seg mode-seg', id: 'modeSeg' }, [
+    modeBtn('interact', t('mode.use'), '', t('mode.useTitle')),
+    modeBtn('pick', t('mode.pick'), 'S', t('mode.pickTitle')),
+    modeBtn('select', t('mode.edit'), 'E', t('mode.editTitle')),
+  ]);
   const moveToggle = el('button', { class: 'mode-switch mode-switch--sub', id: 'moveToggle', type: 'button', role: 'switch', 'aria-checked': 'false', title: t('move.switchTitle') }, [el('span', { class: 'mode-switch__track' }), el('span', { text: t('move.switch') })]);
   const btnMeasure = menuItem('btnMeasure', t('view.measure'), t('view.measureTitle'));
   const btnXray = menuItem('btnXray', t('view.xray'), t('view.xrayTitle'));
@@ -176,7 +191,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   ]);
   const btnCollapse = btn('btnCollapse', '▾', t('dock.collapseTitle'), ' icon');
   const bar = el('div', { class: 'dock__bar' }, [
-    el('div', { class: 'dock__group' }, [modeToggle, moveToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset, ...(btnCapture ? [el('span', { class: 'sep' }), btnCapture] : [])]),
+    el('div', { class: 'dock__group' }, [modeSeg, moveToggle, el('span', { class: 'brand', text: 'frame-mesh' }), viewMenu, el('span', { class: 'sep' }), btnPeek, btnUndo, btnRedo, btnReset, ...(btnCapture ? [el('span', { class: 'sep' }), btnCapture] : [])]),
     el('div', { class: 'dock__group' }, [applied, tabs, btnCopyLog, moreMenu, btnCollapse]),
   ]);
   const grip = el('div', { class: 'dock__grip', title: t('dock.grip') });
@@ -244,7 +259,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
 
   const panel = createPanel({
     els: {
-      tree: el('div'), props: el('div'), changes, diff: diffView, btnPeek, btnDiffView, changeCount, btnUndo, btnRedo, btnReset, modeToggle, modeLabel, moveToggle,
+      tree: el('div'), props: el('div'), changes, diff: diffView, btnPeek, btnDiffView, changeCount, btnUndo, btnRedo, btnReset, modeSeg, moveToggle,
       btnHandoff, btnCopyLog, btnSendLog, btnClearLog, btnMeasure, btnXray, btnFocus, notice,
       handoff: { dialog, text: handoffText, summary: handoffSummary, btnCopy: btnHandoffCopy, btnMd: btnHandoffMd, btnJson: btnHandoffJson, btnClose: btnHandoffClose, receiverInput },
     },
@@ -320,6 +335,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
   function update(state) {
     lastState = state;
     dock.classList.toggle('is-editing', state.mode === 'select');
+    dock.classList.toggle('is-picking', state.mode === 'pick');
     renderApplied();
     chat?.setSelection(state.selections || []);
     if (btnCapture) btnCapture.disabled = !(state.selections && state.selections.length);

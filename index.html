@@ -26,8 +26,9 @@
     </div>
     <div class="topbar__group">
       <div class="seg" id="modeSeg">
-        <button class="seg__btn is-active" type="button" data-mode="select" data-i18n="wb.select"></button>
-        <button class="seg__btn" type="button" data-mode="interact" data-i18n="wb.interact"></button>
+        <button class="seg__btn" type="button" data-mode="interact" data-i18n="wb.interact" data-i18n-title="mode.useTitle"></button>
+        <button class="seg__btn" type="button" data-mode="pick" data-i18n="wb.pick" data-i18n-title="mode.pickTitle"></button>
+        <button class="seg__btn is-active" type="button" data-mode="select" data-i18n="wb.select" data-i18n-title="mode.editTitle"></button>
       </div>
       <button class="mode-switch mode-switch--sub" id="moveToggle" type="button" role="switch" aria-checked="false" data-i18n-title="move.switchTitle"><span class="mode-switch__track"></span><span data-i18n="move.switch"></span></button>
       <button class="btn" id="btnMeasure" type="button" data-i18n="view.measure" data-i18n-title="view.measureTitle"></button>

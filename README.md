@@ -76,6 +76,14 @@ The extension requests access to all sites (`<all_urls>`). It injects code only 
 
 ## Edit a page
 
+The switch at the left end of the dock has three modes. In the web workbench, the same three buttons are at the top.
+
+- **Use**: the page works as usual.
+- **Select** (S): select elements with click, Shift-click, and right-click. Elements do not move, and the resize handles do not show. Use it to ask the agent, capture, or add notes. A purple top border on the dock shows this mode.
+- **Edit** (E): select elements and change them with drag, the handles, the arrow keys, and text edit. A blue top border on the dock shows this mode.
+
+In the table, the rows from "Drag" to "Enter", and the text edit of "Double-click", work only in Edit mode.
+
 | Input | Result |
 |---|---|
 | Click | Selects the visible box under the pointer. It skips transparent link overlays. |
@@ -88,10 +96,11 @@ The extension requests access to all sites (`<all_urls>`). It injects code only 
 | Arrow keys | Move the element 1px. Hold Shift to move it 10px. |
 | Enter | Starts a text edit on a text-only element. Press Enter to keep the text, or Esc to cancel. |
 | ⌘Z / ⇧⌘Z | Undo / redo. |
-| E | Switches between edit mode and normal page use. The extension accepts E only while the side panel is open. |
-| Hold Space | Lets you use the page for a moment. Release Space to return to edit mode with the same selection and overlays. |
+| E | Switches between Edit mode and Use mode. The extension accepts E and S only while the side panel is open. |
+| S | Switches between Select mode and Use mode. From Edit mode, it goes to Select mode. |
+| Hold Space | Lets you use the page for a moment. Release Space to return to the previous mode with the same selection and overlays. |
 
-In edit mode, frame-mesh blocks links and page navigation. A blue top border on the dock shows that edit mode is on. To use the page, turn off the "Editing" switch at the left end of the dock, or press E. The "Free position" switch next to it sets the drag mode.
+In Select and Edit mode, frame-mesh blocks links and page navigation. The "Free position" switch next to the mode switch sets the drag mode.
 
 ### Property panel
 
