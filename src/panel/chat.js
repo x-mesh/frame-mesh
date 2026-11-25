@@ -72,13 +72,22 @@ function shortTime(epochSeconds) {
 }
 
 // 같은 대화를 연 터미널은 이름만으로 구분하기 어려워, 작업 상태·터미널 장치·시작 시각을 덧붙인다.
-function terminalLabel(s, proc) {
-  const details = [
+function procDetails(proc) {
+  return [
     PROC_STATES.includes(proc.status) && t(`chat.proc.${proc.status}`),
     proc.tty,
     proc.started_at && t('chat.proc.started', { time: shortTime(proc.started_at) }),
   ].filter(Boolean);
-  return [sessionLabel(s, proc), ...details].join(' · ');
+}
+
+function terminalLabel(s, proc) {
+  return [sessionLabel(s, proc), ...procDetails(proc)].join(' · ');
+}
+
+// 세션 ID만으로는 어느 터미널인지 알 수 없어, 프로세스 정보가 있으면 터미널 장치와 시작 시각을 붙인다.
+function sessionOptionLabel(s) {
+  const proc = (s.procs || []).find((p) => p.pid === s.pid);
+  return [sessionLabel(s), ...(proc ? procDetails(proc) : [])].join(' · ');
 }
 
 // 중복 세션은 터미널마다 option 하나다. value는 `${session_id}@${pid}`로 두어 같은 세션의 터미널끼리 구분한다.
@@ -361,7 +370,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     const options = [];
     sessions.forEach((s) => {
       if (s.ambiguous) (s.procs || []).forEach((p) => options.push(new Option(terminalLabel(s, p), terminalValue(s, p.pid))));
-      else options.push(new Option(sessionLabel(s), s.session_id));
+      else options.push(new Option(sessionOptionLabel(s), s.session_id));
     });
     sessionSelect.hidden = options.length < 2;
     if (sessionSelect.hidden) return;
