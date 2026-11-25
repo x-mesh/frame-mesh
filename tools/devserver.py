@@ -222,8 +222,8 @@ class Router:
             while len(table) > ID_KEEP:
                 del table[next(iter(table))]
 
-    def send(self, hub, text, context, kind, content=None):
-        result = hub.send(text, context, kind, content)
+    def send(self, hub, text, context, kind, content=None, screenshot=None):
+        result = hub.send(text, context, kind, content, screenshot)
         self._remember(self.requests, result.get("request_id"), hub)
         return result
 
@@ -374,7 +374,7 @@ class Handler(SimpleHTTPRequestHandler):
             return {"ok": True, **ROUTER.status(hub, "chosen")}
         if path == "/chat/send":
             hub, _ = ROUTER.resolve(page, target)
-            return ROUTER.send(hub, body.get("text"), body.get("context"), body.get("kind", "chat"), body.get("content"))
+            return ROUTER.send(hub, body.get("text"), body.get("context"), body.get("kind", "chat"), body.get("content"), body.get("screenshot"))
         if path == "/chat/register":
             # 세션이 알리는 것만으로는 대상을 늘리지 않는다. 맞는 대상이 없으면 기본 hub가 in_target: false로 답한다.
             hub, _ = ROUTER.resolve(cwd=body.get("cwd"))

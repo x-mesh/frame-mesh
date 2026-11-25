@@ -2582,6 +2582,25 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
 
   // 도크처럼 페이지 안에 띄운 작업실 UI를 등록해 선택·드래그 대상에서 제외한다.
   // reserveBottom: 화면 아래를 덮는 상자(도크). 모달을 위로 올렸을 때 모달이 이 상자 위 영역에 들어가도록 줄인다.
+  // 캡처용: 선택한 요소를 모두 담는 화면 좌표 영역. 화면 밖 부분은 잘라 낸다.
+  function getSelectionRect() {
+    const rects = selectedElements().map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height);
+    if (!rects.length) return null;
+    const left = Math.max(0, Math.min(...rects.map((r) => r.left)));
+    const top = Math.max(0, Math.min(...rects.map((r) => r.top)));
+    const right = Math.min(win.innerWidth, Math.max(...rects.map((r) => r.right)));
+    const bottom = Math.min(win.innerHeight, Math.max(...rects.map((r) => r.bottom)));
+    if (right <= left || bottom <= top) return { offscreen: true };
+    return { left, top, width: right - left, height: bottom - top, viewportWidth: win.innerWidth };
+  }
+
+  // 캡처하는 동안 외곽선, 표식, 도크를 숨긴다. 자리는 그대로 두어 페이지 배치가 바뀌지 않게 visibility만 바꾼다.
+  function setUiHidden(hidden) {
+    [ui.host, ...uiRoots].forEach((host) => {
+      if (host) host.style.setProperty('visibility', hidden ? 'hidden' : '', hidden ? 'important' : '');
+    });
+  }
+
   function registerUiRoot(el, { reserveBottom } = {}) {
     uiRoots.push(el);
     if (reserveBottom) {
@@ -2660,7 +2679,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     init, destroy, select, selectParent, setMode, holdInteract, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
     undo: () => { ensureLive(); history.undo(); }, redo: () => { ensureLive(); history.redo(); }, goto: (n) => { ensureLive(); history.goto(n); },
     setPeek, getDiff, setDiffView, editText,
-    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus, addNote,
+    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus, addNote, getSelectionRect, setUiHidden,
     refresh: updateOverlays, getState, getHandoff, exportOps, restoreOps, clearHistory,
     get selectedId() { return state.selectedId; },
   };

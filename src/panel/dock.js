@@ -89,7 +89,7 @@ function h(doc, tag, attrs = {}, children = []) {
   return el;
 }
 
-export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTransport, onOpenPanel, onLanguage }) {
+export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTransport, onOpenPanel, onLanguage, capture = null }) {
   const host = doc.createElement('fm-dock');
   host.setAttribute('data-fm-ui', '');
   const root = host.attachShadow({ mode: 'open' });
@@ -195,7 +195,7 @@ export function createDock({ doc, win, panelCss, bridge, receiver, prefs, chatTr
     dock.classList.toggle('is-chat', name === 'chat');
     if (name === 'chat') {
       if (!chat && chatTransport) {
-        chat = createChat({ root: chatView, transport: chatTransport, bridge, notice: (m) => panel.notice(m), page: () => win.location.origin });
+        chat = createChat({ root: chatView, transport: chatTransport, bridge, notice: (m) => panel.notice(m), page: () => win.location.origin, capture });
         chat.setSelection(lastState?.selections || []);
       }
       if (chat) chat.focus();

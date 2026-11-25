@@ -146,7 +146,7 @@ function waitingOrb(doc) {
   };
 }
 
-export function createChat({ root, transport, bridge, notice = () => {}, page = null }) {
+export function createChat({ root, transport, bridge, notice = () => {}, page = null, capture = null }) {
   const doc = root.ownerDocument;
   const el = (tag, cls, text) => {
     const n = doc.createElement(tag);
@@ -155,7 +155,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     return n;
   };
   // epoch: 대상이 바뀔 때마다 올라간다. 이전 대상으로 보낸 이벤트 조회가 늦게 돌아와도 버리기 위해서다.
-  const view = { openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
+  const view = { attachShot: false, openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
 
   // 전달 상태 문구를 바꾼다. 응답 대기 상태면 문구 앞에 대기 표시를 두고, 다른 상태로 바뀌면 그리기를 멈춘다.
   function setMeta(meta, text, waiting = false) {
@@ -214,6 +214,17 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
   btnApply.title = t('chat.applyTitle');
   const pickedRow = el('div', 'chat__picked');
   pickedRow.hidden = true;
+  // 캡처는 확장에서만 할 수 있다. capture가 없으면(웹 작업실) 토글을 그리지 않는다.
+  const shotToggle = capture ? el('button', 'chat__shot', t('chat.attachShot')) : null;
+  if (shotToggle) {
+    shotToggle.type = 'button';
+    shotToggle.title = t('chat.attachShotTitle');
+    shotToggle.setAttribute('aria-pressed', 'false');
+    shotToggle.addEventListener('click', () => {
+      view.attachShot = !view.attachShot;
+      shotToggle.setAttribute('aria-pressed', String(view.attachShot));
+    });
+  }
   form.append(pickedRow, input, el('div', 'chat__actions'));
   form.lastChild.append(btnSend, btnApply);
   root.append(head, list, form);
@@ -248,6 +259,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
         more.title = current.map(targetChipText).join(', ');
         pickedRow.appendChild(more);
       }
+      if (shotToggle) pickedRow.appendChild(shotToggle);
     }
     if (atBottom) scrollDown();
   }
@@ -427,9 +439,21 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     } catch (_) {
       // 문맥 없이도 보낼 수 있다. 엔진이 아직 준비되지 않은 경우다.
     }
+    let screenshot = null;
+    if (capture && view.attachShot && context.selections && context.selections.length) {
+      // 캡처하지 못해도 요청은 첨부 없이 보낸다. 실패는 알림으로 보인다.
+      try {
+        const shot = await capture();
+        if (shot && shot.dataUrl) screenshot = shot.dataUrl;
+        else notice(t('chat.captureFailed', { msg: shot && shot.error === 'offscreen' ? t('chat.captureOffscreen') : (shot && shot.error) || '?' }));
+      } catch (err) {
+        notice(t('chat.captureFailed', { msg: err.message }));
+      }
+    }
     try {
-      const res = await request('POST', '/chat/send', { text, context, content, kind });
+      const res = await request('POST', '/chat/send', { text, context, content, kind, ...(screenshot ? { screenshot } : {}) });
       if (res.ok && res.content_error) notice(t('chat.contentFailed', { msg: res.content_error }));
+      if (res.ok && res.screenshot_error) notice(t('chat.screenshotFailed', { msg: res.screenshot_error }));
       if (!res.ok) throw new Error(res.error || t('chat.sendFailedBody'));
       if (res.mode === 'manual') notice(t('chat.queuedNotice'));
       refreshStatus();
@@ -543,7 +567,8 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     if (e.kind === 'user') {
       const meta = el('div', 'chat__meta', t('chat.sending'));
       view.deliveries.set(e.request_id, meta);
-      bubble('user', e.request_kind === 'apply' ? t('chat.applyTag', { text: e.text }) : e.text, meta, e.selection);
+      const b = bubble('user', e.request_kind === 'apply' ? t('chat.applyTag', { text: e.text }) : e.text, meta, e.selection);
+      if (e.images && e.images.length) attachImages(b, e.images);
     } else if (e.kind === 'delivery') {
       const meta = view.deliveries.get(e.request_id);
       if (meta) setMeta(meta, e.state === 'error' ? t('chat.deliveryFallback', { label: t('chat.delivery.error'), error: e.error || '' }) : (DELIVERY_STATES.includes(e.state) ? t(`chat.delivery.${e.state}`) : e.state), WAITING_STATES.includes(e.state));
