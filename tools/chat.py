@@ -373,16 +373,23 @@ class ChatHub:
         }
 
     def sessions(self):
-        """후보 세션: 등록부(mcp)와 발견 세션(cli). 같은 ID면 mcp만 남긴다."""
+        """후보 세션: 등록부(mcp)와 발견 세션(cli). 같은 ID면 mcp만 남기고, 이름과 상태는 발견 세션 것을 쓴다."""
         pin = self._live_pin()
         now = time.time()
         with self.lock:
             live = [(e, {p: {"name": e["name"], "status": None} for p, seen in e["pids"].items() if now - seen < SESSION_FRESH_S}) for e in self.registered.values()
                     if now - e["last_seen"] < SESSION_FRESH_S and self._in_target(e["cwd"])]
         live.sort(key=lambda item: item[0]["registered_at"])
-        found = [self._entry(e["session_id"], e["name"], e["cwd"], "mcp", e["registered_at"], procs, pin) for e, procs in live]
+        discovered = {s["session_id"]: s for s in self._discover()}
+        found = []
+        for e, procs in live:
+            # MCP 등록 이름은 세션 ID 앞 8자리뿐이다. 전달 명령이 같은 세션을 찾았으면 그 이름(Claude 세션 제목)과 프로세스 상태를 쓴다.
+            seen = discovered.get(e["session_id"])
+            if seen:
+                procs = {pid: {**info, **{k: v for k, v in seen["procs"].get(pid, {}).items() if v}} for pid, info in procs.items()}
+            found.append(self._entry(e["session_id"], seen["name"] if seen else e["name"], e["cwd"], "mcp", e["registered_at"], procs, pin))
         taken = {s["session_id"] for s in found}
-        found += [self._entry(s["session_id"], s["name"], s["cwd"], "cli", None, s["procs"], pin) for s in self._discover() if s["session_id"] not in taken]
+        found += [self._entry(s["session_id"], s["name"], s["cwd"], "cli", None, s["procs"], pin) for s in discovered.values() if s["session_id"] not in taken]
         # 지정한 세션이 목록에 없어도 프로세스가 살아 있으면 후보로 둔다(전달 명령이 아직 못 찾았을 수 있다).
         if pin and all(s["session_id"] != pin["session_id"] for s in found):
             found.append(self._entry(pin["session_id"], pin["session_id"][:8], pin["cwd"], "cli", None, {pin["pid"]: {"name": pin["session_id"][:8], "status": None}}, pin))
