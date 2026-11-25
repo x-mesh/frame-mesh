@@ -30,7 +30,16 @@ export class History {
     this.onChange(null);
   }
 
+  // 변경 ID는 에이전트가 처리 결과를 알릴 때 쓴다. 복원한 변경은 저장된 ID를 그대로 둔다.
+  newId() {
+    const used = new Set(this.ops.map((op) => op.id));
+    let id;
+    do id = `c${Math.random().toString(36).slice(2, 8).padEnd(6, '0')}`; while (used.has(id));
+    return id;
+  }
+
   push(op) {
+    if (!op.id) op.id = this.newId();
     this.ops.length = this.cursor;
     this.ops.push(op);
     this.cursor += 1;

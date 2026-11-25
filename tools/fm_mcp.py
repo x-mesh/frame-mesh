@@ -57,6 +57,15 @@ TOOLS = [
         "inputSchema": {"type": "object", "properties": {"request_id": {"type": "string"}, "summary": {"type": "string", "description": "The proposal in one line"}, "reason": {"type": "string", "description": "One or two sentences: the problem and how the change improves it"}, "ops": OPS_SCHEMA}, "required": ["request_id", "summary", "reason", "ops"]},
     },
     {
+        "name": "fm_report_changes",
+        "description": "After you apply the changes of a frame-mesh apply request to the source, report what you did with each change. The id of each change is in brackets at the start of each item in the handoff file. The user sees the status next to each change.",
+        "inputSchema": {"type": "object", "properties": {"request_id": {"type": "string"}, "changes": {"type": "array", "items": {"type": "object", "properties": {
+            "id": {"type": "string", "description": "Change id from the handoff file, for example c1a2b3c"},
+            "status": {"type": "string", "enum": ["applied", "skipped"]},
+            "note": {"type": "string", "description": "Optional. For skipped: why. For applied: where, if it is not obvious"},
+        }, "required": ["id", "status"]}}}, "required": ["request_id", "changes"]},
+    },
+    {
         "name": "fm_wait_request",
         "description": "Wait for the next request in the frame-mesh chat when the chat status is wait or manual (no relay). If a request arrives, return it. If no request arrives in time, return 'no request'. Call this repeatedly only when the user asks you to receive frame-mesh chat requests. Stop after several 'no request' results in a row.",
         "inputSchema": {"type": "object", "properties": {"timeout_seconds": {"type": "integer", "description": f"Maximum wait in seconds (default {WAIT_DEFAULT_S})"}}},
@@ -86,6 +95,8 @@ def call_tool(name, args):
         return http("POST", "/chat/reply", {"request_id": args.get("request_id"), "text": args.get("text")})
     if name == "fm_propose":
         return http("POST", "/chat/propose", {"request_id": args.get("request_id"), "summary": args.get("summary"), "reason": args.get("reason"), "ops": args.get("ops")})
+    if name == "fm_report_changes":
+        return http("POST", "/chat/changes", {"request_id": args.get("request_id"), "changes": args.get("changes")})
     if name == "fm_wait_request":
         wait = int(args.get("timeout_seconds") or WAIT_DEFAULT_S)
         # 서버가 여러 프로젝트를 맡을 수 있어, 이 세션의 작업 폴더로 어느 프로젝트의 요청인지 알린다.

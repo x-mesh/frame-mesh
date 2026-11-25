@@ -1804,6 +1804,23 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     onChange({ type: 'history', kind: op ? op.kind : 'clear' });
   }
 
+  // 에이전트가 적용 요청을 처리하고 알린 변경별 결과를 변경 기록에 남긴다. 이력에 없는 ID는 센다.
+  function setChangeStatus(items) {
+    let unknown = 0;
+    let changed = false;
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const op = item && history.ops.find((o) => o.id === item.id);
+      if (!op) {
+        unknown += 1;
+        return;
+      }
+      op.agent = { status: item.status, note: item.note || '' };
+      changed = true;
+    });
+    if (changed) onChange({ type: 'history', kind: 'status' });
+    return { unknown };
+  }
+
   function opBase(el) {
     const vp = readViewport();
     return { target: el.dataset.fmId, label: describe(el), path: elementPath(el), excerpt: shortText(el), viewport: vp.key, width: vp.width, at: Date.now() };
@@ -2473,7 +2490,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
       focus: state.focus,
       selection: el ? selectionInfo(el) : null,
       selections: selectedElements().map((item) => ({ id: item.dataset.fmId, label: describe(item), path: elementPath(item), excerpt: shortText(item) })),
-      changes: history.ops.map((op, i) => ({ n: i + 1, at: op.at, label: op.label, desc: describeOp(op), vp: labelViewport(op), undone: i >= history.cursor, restored: !!op.restored, lost: !!op.lost })),
+      changes: history.ops.map((op, i) => ({ n: i + 1, id: op.id, agent: op.agent ? op.agent.status : null, agentNote: op.agent ? op.agent.note : '', at: op.at, label: op.label, desc: describeOp(op), vp: labelViewport(op), undone: i >= history.cursor, restored: !!op.restored, lost: !!op.lost })),
       cursor: history.cursor,
       total: history.ops.length,
       applied: appliedCount(),
@@ -2601,7 +2618,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     init, destroy, select, selectParent, setMode, holdInteract, setMoveMode, setMeasure, setXray, setFocus, setScale, setStyle, registerUiRoot, togglePushRight, nudge, moveWithin, requestMove,
     undo: () => { ensureLive(); history.undo(); }, redo: () => { ensureLive(); history.redo(); }, goto: (n) => { ensureLive(); history.goto(n); },
     setPeek, getDiff, setDiffView, editText,
-    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets,
+    previewProposal, acceptProposal, rejectProposal, getChatContext, getChatContent, selectTargets, setChangeStatus,
     refresh: updateOverlays, getState, getHandoff, exportOps, restoreOps, clearHistory,
     get selectedId() { return state.selectedId; },
   };

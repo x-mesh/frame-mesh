@@ -4,10 +4,11 @@
 MCP를 등록하지 않은 에이전트 세션이 Bash로 frame-mesh 대화에 답할 때 쓴다.
   frame-mesh reply <request_id> [--url URL] [text]        text가 없거나 "-"이면 stdin 전체
   frame-mesh propose <request_id> --summary S --reason R [--url URL] [--ops-file F]
+  frame-mesh report <request_id> [--url URL] [--file F]  변경별 처리 결과 JSON 배열을 stdin이나 F에서 읽는다
   frame-mesh state [--url URL]
   frame-mesh connect [--url URL]                          Claude Code 세션 안에서 `! frame-mesh connect`로 실행
   frame-mesh whoami                                       Claude Code 세션 안에서 `! frame-mesh whoami`로 실행. 서버가 없어도 된다
-reply/propose/state는 fm_mcp.call_tool을 그대로 호출하므로 개발 서버 요청 경로와 오류 문구는 MCP 도구와 같다.
+reply/propose/report/state는 fm_mcp.call_tool을 그대로 호출하므로 개발 서버 요청 경로와 오류 문구는 MCP 도구와 같다.
 결과 JSON 한 줄을 stdout에 쓰고, ok가 false면 종료 코드 1, 입력 오류면 stderr에 한 줄 쓰고 종료 코드 2다.
 connect와 whoami는 사람이 읽는 줄을 쓴다(`!`로 실행하면 대화에 그대로 보인다).
 """
@@ -56,6 +57,23 @@ def build_propose(args):
     if not isinstance(ops, list):
         raise InputError("ops must be a JSON array")
     return "fm_propose", {"request_id": args.request_id, "summary": args.summary, "reason": args.reason, "ops": ops}
+
+
+def build_report(args):
+    if args.file:
+        try:
+            raw = Path(args.file).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as err:
+            raise InputError(f"cannot read --file {args.file}: {err}")
+    else:
+        raw = read_stdin()
+    try:
+        changes = json.loads(raw)
+    except ValueError as err:
+        raise InputError(f"changes is not valid JSON: {err}")
+    if not isinstance(changes, list):
+        raise InputError("changes must be a JSON array")
+    return "fm_report_changes", {"request_id": args.request_id, "changes": changes}
 
 
 def build_state(args):
@@ -150,6 +168,12 @@ def make_parser():
     propose.add_argument("--url", help=url_help)
     propose.add_argument("--ops-file")
     propose.set_defaults(build=build_propose)
+
+    report = sub.add_parser("report", help="Report what you did with each change of an apply request (JSON array on stdin or --file)")
+    report.add_argument("request_id")
+    report.add_argument("--url", help=url_help)
+    report.add_argument("--file")
+    report.set_defaults(build=build_report)
 
     state = sub.add_parser("state", help="Read the page state that the user sees")
     state.add_argument("--url", help=url_help)

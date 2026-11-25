@@ -155,7 +155,7 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
     return n;
   };
   // epoch: 대상이 바뀔 때마다 올라간다. 이전 대상으로 보낸 이벤트 조회가 늦게 돌아와도 버리기 위해서다.
-  const view = { loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
+  const view = { openedAt: Date.now(), loaded: null, since: 0, alive: true, status: null, connected: false, proposals: new Map(), deliveries: new Map(), orbs: new Map(), previewId: null, target: null, epoch: 0 };
 
   // 전달 상태 문구를 바꾼다. 응답 대기 상태면 문구 앞에 대기 표시를 두고, 다른 상태로 바뀌면 그리기를 멈춘다.
   function setMeta(meta, text, waiting = false) {
@@ -560,6 +560,15 @@ export function createChat({ root, transport, bridge, notice = () => {}, page = 
       view.proposals.set(e.proposal.id, card);
       list.appendChild(card);
       scrollDown();
+    } else if (e.kind === 'change_status') {
+      const items = e.changes || [];
+      const applied = items.filter((c) => c.status === 'applied').length;
+      const meta = view.deliveries.get(e.request_id);
+      if (meta) setMeta(meta, t('chat.changesReported', { applied, skipped: items.length - applied }));
+      Promise.resolve(bridge.call('setChangeStatus', items)).then((res) => {
+        // 이벤트는 패널을 열 때 처음부터 다시 받는다. 지난 보고의 없는 ID까지 매번 알리지 않도록 새 보고만 알린다.
+        if (res && res.unknown && e.at * 1000 >= view.openedAt) notice(t('chat.changesUnknown', { n: res.unknown }));
+      }).catch(() => {});
     } else if (e.kind === 'status') {
       refreshStatus();
     }

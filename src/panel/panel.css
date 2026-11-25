@@ -129,6 +129,8 @@ button { cursor: pointer; }
 .change__time { color: var(--ink-3); }
 .change__flag { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; font-size: 10px; background: var(--accent-soft); color: var(--accent); }
 .change--lost .change__flag { background: var(--warn-bg); color: var(--warn-ink); }
+.change__agent { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; font-size: 10px; background: #e6f6ec; color: #1a7f3c; }
+.change__agent.is-skipped { background: var(--warn-bg); color: var(--warn-ink); }
 .change--lost { color: var(--warn-ink); }
 .change:hover { background: #f4f4f7; }
 .change.is-undone { color: var(--ink-3); text-decoration: line-through; }
