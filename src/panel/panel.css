@@ -102,6 +102,8 @@ button { cursor: pointer; }
 .crumbs button.is-current { color: var(--ink); font-weight: 600; }
 .crumbs span { color: var(--ink-3); }
 .actions-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.props__memo { display: flex; gap: 6px; }
+.props__memo-input { flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
 .actions-row .btn.is-active { background: var(--accent-soft); border-color: var(--accent); }
 .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
 .fields--single { grid-template-columns: 1fr; }
