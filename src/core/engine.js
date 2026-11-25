@@ -4,6 +4,7 @@ import { ALL_PROPS, TEXT_PROP } from './props.js';
 import { buildHandoff, cleanElementHtml, describeOp, elementPath } from './handoff.js';
 import { t } from './i18n.js';
 import { isLetterKey } from './keys.js';
+import { createTokenIndex } from './tokens.js';
 
 const COALESCE_MS = 1000;
 const DRAG_THRESHOLD = 4;
@@ -185,6 +186,7 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
   const readViewport = getViewport || (() => ({ key: 'window', width: win.innerWidth }));
   const labelViewport = viewportLabel || ((op) => t('op.width', { width: op.width }));
   const scroller = autoScroll || defaultAutoScroll;
+  const tokens = createTokenIndex({ doc, win, uiAttr: UI_ATTR });
   const history = new History({ apply: applyOp, revert: revertOp, onChange: onHistoryChange });
   const sumPx = (cs, keys) => keys.reduce((sum, k) => sum + (parseFloat(cs[k]) || 0), 0);
 
@@ -2525,11 +2527,33 @@ export function createEngine({ doc, win, source = '', onChange = () => {}, onNot
     };
   }
 
+  // 적용 중인 스타일 변경마다 관련 디자인 토큰을 찾는다. 위치 이동(left/top)은 토큰과 관계가 없어 뺀다.
+  function tokenHints() {
+    const session = tokens.session();
+    try {
+      const byOp = new Map();
+      applied().forEach((op) => {
+        const el = byId(op.target);
+        if (!el) return;
+        const entries = op.kind === 'style' ? [[op.prop, op.after, op.before]]
+          : op.kind === 'styles' && op.gesture === 'resize' ? Object.keys(op.after).map((p) => [p, op.after[p], op.before[p]]) : [];
+        const hints = entries.map(([prop, after, before]) => {
+          const h = session.hint(el, prop, after, before);
+          return h && { prop, ...h };
+        }).filter(Boolean);
+        if (hints.length) byOp.set(op.id, hints);
+      });
+      return { byOp, ...session.info() };
+    } finally {
+      session.close();
+    }
+  }
+
   function getHandoff(options = {}) {
     // 원본 보기 중이면 결과 HTML이 원본이 되므로 잠시 다시 적용한 상태로 만든다.
     const wasPeek = state.peek;
     if (wasPeek) setPeek(false);
-    const result = buildHandoff({ sourceName: source, ops: history.ops, cursor: history.cursor, doc, viewportLabel: labelViewport, byId, htmlMode: options.htmlMode, diff: getDiff() });
+    const result = buildHandoff({ sourceName: source, ops: history.ops, cursor: history.cursor, doc, viewportLabel: labelViewport, byId, htmlMode: options.htmlMode, diff: getDiff(), tokens: tokenHints() });
     if (wasPeek) setPeek(true);
     return result;
   }
